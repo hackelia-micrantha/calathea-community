@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calathea — Project Summary</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121935;
+      --panel-2: #182245;
+      --text: #e8ecff;
+      --muted: #a9b3d9;
+      --accent: #8ab4ff;
+      --accent-2: #7ee7c1;
+      --border: rgba(255,255,255,0.09);
+      --shadow: 0 20px 60px rgba(0,0,0,0.35);
+      --max: 1180px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(138,180,255,0.15), transparent 28%),
+        radial-gradient(circle at top left, rgba(126,231,193,0.12), transparent 24%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      width: min(calc(100% - 2rem), var(--max));
+      margin: 0 auto;
+    }
+
+    .hero {
+      padding: 72px 0 40px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 0.5rem;
+      align-items: center;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 0.45rem 0.8rem;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+
+    h1, h2, h3 { line-height: 1.15; margin: 0 0 0.8rem; }
+    h1 { font-size: clamp(2.4rem, 5vw, 4.4rem); letter-spacing: -0.04em; }
+    h2 { font-size: clamp(1.5rem, 2.2vw, 2.2rem); letter-spacing: -0.02em; }
+    h3 { font-size: 1.05rem; }
+
+    .lead {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 760px;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 1.25rem;
+      align-items: start;
+      margin-top: 2rem;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 1.15rem;
+    }
+
+    .metric-grid,
+    .grid-3,
+    .grid-2 {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .metric-grid { grid-template-columns: repeat(3, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+
+    .metric {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1rem;
+    }
+
+    .metric .value {
+      font-size: 1.7rem;
+      font-weight: 700;
+      margin-bottom: 0.2rem;
+    }
+
+    .metric .label,
+    .muted {
+      color: var(--muted);
+    }
+
+    section {
+      padding: 34px 0;
+    }
+
+    ul {
+      margin: 0.5rem 0 0;
+      padding-left: 1.15rem;
+    }
+
+    li + li { margin-top: 0.4rem; }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 0.8rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      padding: 0.45rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(138,180,255,0.08);
+      color: #d8e6ff;
+      font-size: 0.92rem;
+    }
+
+    .timeline {
+      position: relative;
+      margin-top: 1rem;
+      padding-left: 1rem;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 0.2rem;
+      top: 0.3rem;
+      bottom: 0.3rem;
+      width: 2px;
+      background: linear-gradient(var(--accent), transparent);
+      opacity: 0.8;
+    }
+
+    .timeline-item {
+      position: relative;
+      padding-left: 1.1rem;
+      margin-bottom: 1rem;
+    }
+
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: -0.1rem;
+      top: 0.35rem;
+      width: 0.7rem;
+      height: 0.7rem;
+      border-radius: 50%;
+      background: var(--accent-2);
+      box-shadow: 0 0 0 4px rgba(126,231,193,0.12);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      color: #dce5ff;
+      font-size: 0.94rem;
+      background: rgba(255,255,255,0.03);
+    }
+
+    footer {
+      padding: 28px 0 60px;
+      color: var(--muted);
+    }
+
+    .code-block {
+      background: #0b1229;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92rem;
+      color: #dfe6ff;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 920px) {
+      .hero-grid,
+      .grid-3,
+      .grid-2,
+      .metric-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <div class="eyebrow">Calathea · Project Summary</div>
+      <h1 style="display:flex; align-items:center; gap:0.5rem;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 576" role="img" aria-label="Calathea" style="height:1.15em; width:auto; flex-shrink:0;">
+          <path d="M288 22c146.9 0 266 119.1 266 266S434.9 554 288 554 22 434.9 22 288 141.1 22 288 22Zm0 70c-108.3 0-196 87.7-196 196s87.7 196 196 196 196-87.7 196-196S396.3 92 288 92Zm0 88c59.8 0 108 48.2 108 108s-48.2 108-108 108-108-48.2-108-108 48.2-108 108-108Zm0 69c-21.7 0-39 17.3-39 39s17.3 39 39 39 39-17.3 39-39-17.3-39-39-39Z" fill="currentColor" opacity=".2"/>
+          <path d="M546.2 9.7c-5.6-12.5-21.6-13-28.3-1.2C486.9 62.4 431.4 96 368 96h-80C182 96 96 182 96 288c0 7 .8 13.7 1.5 20.5C161.3 262.8 253.4 224 384 224c8.8 0 16 7.2 16 16s-7.2 16-16 16C132.6 256 26 410.1 2.4 468c-6.6 16.3 1.2 34.9 17.5 41.6 16.4 6.8 35-1.1 41.8-17.3 1.5-3.6 20.9-47.9 71.9-90.6 32.4 43.9 94 85.8 174.9 77.2C465.5 467.5 576 326.7 576 154.3c0-50.2-10.8-102.2-29.8-144.6z" fill="currentColor" transform="translate(128 150) scale(.5)"/>
+          <path d="M178 424c42-69 100-113 178-132" stroke="currentColor" stroke-width="14" stroke-linecap="round" fill="none" opacity=".32"/>
+          <path d="M215 382c25-29 58-52 102-68" stroke="currentColor" stroke-width="8" stroke-linecap="round" fill="none" opacity=".55"/>
+        </svg>
+        Calathea
+      </h1>
+      <p class="lead">
+        A structured project operating model for planning, governing, implementing, reviewing, and maintaining long-lived technical work.
+        Calathea is intended to create a paved road that keeps strategy, specifications, execution, and feedback loops connected rather than drifting apart.
+      </p>
+
+      <div class="pill-row">
+        <span class="pill">Planning System</span>
+        <span class="pill">Prioritization</span>
+        <span class="pill">RFC / Spec Flow</span>
+        <span class="pill">Repository Integration</span>
+        <span class="pill">Review System</span>
+        <span class="pill">Maintenance & Archiving</span>
+      </div>
+
+      <div class="hero-grid">
+        <div class="card">
+          <h2>Core idea</h2>
+          <p class="muted">
+            Calathea treats project execution as a governed lifecycle rather than a backlog of disconnected tasks. It defines how work is proposed, shaped,
+            approved, implemented, reviewed, measured, maintained, and eventually archived.
+          </p>
+          <div class="metric-grid">
+            <div class="metric">
+              <div class="value">1</div>
+              <div class="label">Connected system from idea to archive</div>
+            </div>
+            <div class="metric">
+              <div class="value">N</div>
+              <div class="label">Projects, repos, teams, or workstreams supported</div>
+            </div>
+            <div class="metric">
+              <div class="value">Looped</div>
+              <div class="label">Implementation feeds reality back into planning</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>What it is optimizing for</h3>
+          <ul>
+            <li>Clear goals, outcomes, and measurable success</li>
+            <li>Reduced drift between intent and implementation</li>
+            <li>High-signal prioritization under limited capacity</li>
+            <li>Consistent communication surfaces across artifacts</li>
+            <li>Sustainable maintenance for long-lived systems</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="container grid-2">
+        <div class="card">
+          <h2>Goals</h2>
+          <ul>
+            <li>Define a formal project model that scales from early design to long-term maintenance.</li>
+            <li>Create a paved road for artifacts, decisions, planning cadence, implementation, and review.</li>
+            <li>Support flat but explicit roles and responsibilities without collapsing accountability.</li>
+            <li>Make progress legible through milestones, phases, definitions of done, and metrics.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h2>Desired outcomes</h2>
+          <ul>
+            <li>Less ambiguity about what to build, why now, and what “done” means.</li>
+            <li>Lower coordination overhead across docs, repos, reviews, and stakeholder updates.</li>
+            <li>Better prioritization by expected value, risk, effort, and strategic fit.</li>
+            <li>A durable feedback loop from implementation back into specs and planning.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <h2>Operating model</h2>
+        <div class="grid-3">
+          <div class="card">
+            <h3>1. Strategy</h3>
+            <p class="muted">Set direction through goals, expected outcomes, constraints, and project policy.</p>
+          </div>
+          <div class="card">
+            <h3>2. Specification</h3>
+            <p class="muted">Shape work through RFCs, specs, architecture notes, and communication guidance.</p>
+          </div>
+          <div class="card">
+            <h3>3. Planning</h3>
+            <p class="muted">Translate specs into prioritized milestones, phases, review gates, and executable work.</p>
+          </div>
+          <div class="card">
+            <h3>4. Execution</h3>
+            <p class="muted">Integrate with repositories, tasks, delivery workflows, and implementation telemetry.</p>
+          </div>
+          <div class="card">
+            <h3>5. Review</h3>
+            <p class="muted">Continuously check quality, alignment, risks, drift, and readiness against definition of done.</p>
+          </div>
+          <div class="card">
+            <h3>6. Maintenance</h3>
+            <p class="muted">Handle stewardship, stakeholder reporting, updates, archival policy, and lifecycle hygiene.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container grid-2">
+        <div class="card">
+          <h2>Key systems inside Calathea</h2>
+          <ul>
+            <li><strong>PRD / goals system:</strong> goals, outcomes, success metrics, hero metrics</li>
+            <li><strong>Paved road:</strong> standard artifact types, repo conventions, AI tool policy, integrations</li>
+            <li><strong>Prioritization system:</strong> risk, leverage, urgency, strategic fit, dependency awareness</li>
+            <li><strong>Planning system:</strong> phases, milestones, breakdown rules, review points</li>
+            <li><strong>Review system:</strong> design review, implementation review, rollout review, maintenance review</li>
+            <li><strong>Feedback loop:</strong> implementation findings update specs, plans, and future priority</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h2>Communication surfaces</h2>
+          <ul>
+            <li>Charter / project summary</li>
+            <li>RFCs and specs</li>
+            <li>Planning documents and milestone reports</li>
+            <li>Status summaries and decision logs</li>
+            <li>Repository-integrated task and implementation notes</li>
+            <li>Archive records for historical traceability</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <h2>Lifecycle flow</h2>
+        <div class="card">
+          <div class="timeline">
+            <div class="timeline-item">
+              <h3>Intake and framing</h3>
+              <p class="muted">Capture the problem, context, goals, outcomes, constraints, and stakeholders.</p>
+            </div>
+            <div class="timeline-item">
+              <h3>Shaping and specification</h3>
+              <p class="muted">Produce RFCs, specs, diagrams, paved-road guidance, and success metrics.</p>
+            </div>
+            <div class="timeline-item">
+              <h3>Prioritization and planning</h3>
+              <p class="muted">Sequence work into phases and milestones using a repeatable evaluation model.</p>
+            </div>
+            <div class="timeline-item">
+              <h3>Implementation and review</h3>
+              <p class="muted">Execute in repositories with explicit review gates and definition-of-done checks.</p>
+            </div>
+            <div class="timeline-item">
+              <h3>Operational learning</h3>
+              <p class="muted">Feed implementation outcomes, incidents, surprises, and maintenance realities back upstream.</p>
+            </div>
+            <div class="timeline-item">
+              <h3>Maintenance and archive</h3>
+              <p class="muted">Steward active work, sunset stale paths, and preserve historical decisions and artifacts.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <h2>Artifact model</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Artifact</th>
+                <th>Purpose</th>
+                <th>Typical content</th>
+                <th>When it matters most</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Project Summary / Charter</td>
+                <td>Shared frame for the project</td>
+                <td>Mission, scope, constraints, stakeholders</td>
+                <td>Project formation</td>
+              </tr>
+              <tr>
+                <td>PRD / Outcomes Doc</td>
+                <td>Define goals, outcomes, and metrics</td>
+                <td>Hero metric, leading indicators, non-goals</td>
+                <td>Before planning and prioritization</td>
+              </tr>
+              <tr>
+                <td>RFC / Spec</td>
+                <td>Shape important decisions</td>
+                <td>Design, alternatives, trade-offs, policy</td>
+                <td>When change has architectural weight</td>
+              </tr>
+              <tr>
+                <td>Plan / Milestone Doc</td>
+                <td>Convert intent into execution</td>
+                <td>Phases, milestones, dependencies, review gates</td>
+                <td>Active delivery</td>
+              </tr>
+              <tr>
+                <td>Implementation Feedback</td>
+                <td>Prevent planning drift</td>
+                <td>Findings, blockers, deviations, lessons</td>
+                <td>During and after implementation</td>
+              </tr>
+              <tr>
+                <td>Archive Record</td>
+                <td>Preserve history and rationale</td>
+                <td>Status, closure reason, successor paths</td>
+                <td>Retirement or supersession</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container grid-2">
+        <div class="card">
+          <h2>Definition of done</h2>
+          <ul>
+            <li><strong>Artifact done:</strong> clear, reviewable, internally consistent</li>
+            <li><strong>Phase done:</strong> agreed scope and exit criteria met</li>
+            <li><strong>Milestone done:</strong> outcome demonstrated, not just work completed</li>
+            <li><strong>Project done:</strong> goals met or consciously closed with archive path</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h2>Phase and milestone policy</h2>
+          <ul>
+            <li>Each phase should have intent, entry criteria, exit criteria, and review owner(s).</li>
+            <li>Milestones should represent validated outcomes, not ticket counts.</li>
+            <li>Cross-phase changes should update planning artifacts rather than relying on tribal memory.</li>
+            <li>Late discovery should feed back into prioritization and spec maintenance.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container grid-2">
+        <div class="card">
+          <h2>Repository integration strategy</h2>
+          <ul>
+            <li>Map project artifacts to repo structure and workflow triggers.</li>
+            <li>Keep design intent close to implementation without forcing everything into code comments.</li>
+            <li>Allow review systems to inspect both artifact state and repository state.</li>
+            <li>Create a standard path for AI skills, plugins, extensions, and policy guardrails.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h2>Long-term stewardship</h2>
+          <ul>
+            <li>Define owners without imposing unnecessary hierarchy.</li>
+            <li>Establish maintenance cadence and stakeholder update patterns.</li>
+            <li>Track drift, stale plans, and orphaned artifacts.</li>
+            <li>Archive intentionally to preserve signal and reduce clutter.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <h2>Summary in one line</h2>
+        <div class="card">
+          <p>
+            Calathea is a project operating framework that connects goals, specifications, prioritization, planning, implementation, review, maintenance, and archival into one durable system. It is designed to align closely with Anthesis, acting as the execution and project-layer counterpart to Anthesis’ governance, RFC, and agentic SDLC model.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <h2>Relationship to Anthesis</h2>
+        <div class="card">
+          <p class="muted">
+            Calathea and Anthesis are complementary systems. Anthesis provides the governance layer — RFCs, invariant rules, agent coordination, and secure SDLC principles — while Calathea provides the project operating model that structures how work flows through planning, prioritization, execution, and maintenance.
+          </p>
+          <ul>
+            <li><strong>Anthesis:</strong> Defines how decisions are made, governed, and enforced (RFCs, invariants, agent workflows).</li>
+            <li><strong>Calathea:</strong> Defines how work is shaped, sequenced, executed, and maintained over time.</li>
+            <li><strong>Integration point:</strong> RFCs and specs produced in Anthesis feed directly into Calathea planning and prioritization systems.</li>
+            <li><strong>Feedback loop:</strong> Implementation results from Calathea feed back into Anthesis artifacts, preventing governance drift.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <h2>Lightweight model</h2>
+        <div class="code-block">Idea → Goals / Outcomes → RFC / Spec → Prioritization → Phase Plan → Repository Work → Review → Feedback → Maintenance / Archive</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      Calathea frontend summary · single-file HTML artifact for discussion, iteration, and future expansion.
+    </div>
+  </footer>
+</body>
+</html>
