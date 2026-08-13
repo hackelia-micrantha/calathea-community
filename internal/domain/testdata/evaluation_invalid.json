@@ -1,0 +1,35 @@
+{
+  "fixture_version": "evaluation-invalid.v1",
+  "cases": [
+    {
+      "name": "axis below range",
+      "axis_value": 0,
+      "rationale": "invalid score"
+    },
+    {
+      "name": "axis above range",
+      "axis_value": 6,
+      "rationale": "invalid score"
+    },
+    {
+      "name": "missing rationale",
+      "axis_value": 3,
+      "rationale": ""
+    },
+    {
+      "name": "confidence below range",
+      "confidence_basis_points": -1,
+      "confidence_rationale": "invalid confidence"
+    },
+    {
+      "name": "confidence above range",
+      "confidence_basis_points": 10001,
+      "confidence_rationale": "invalid confidence"
+    },
+    {
+      "name": "missing confidence rationale",
+      "confidence_basis_points": 5000,
+      "confidence_rationale": ""
+    }
+  ]
+}
