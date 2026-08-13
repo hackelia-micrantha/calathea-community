@@ -15,12 +15,12 @@ import (
 )
 
 const (
-	PolicyCapacityNow       domain.PolicyID = "orientation.capacity.now"
-	PolicyCapacityNext      domain.PolicyID = "orientation.capacity.next"
-	PolicyEvaluationRequired domain.PolicyID = "orientation.evaluation.required"
+	PolicyCapacityNow          domain.PolicyID = "orientation.capacity.now"
+	PolicyCapacityNext         domain.PolicyID = "orientation.capacity.next"
+	PolicyEvaluationRequired  domain.PolicyID = "orientation.evaluation.required"
 	PolicyLifecycleEligibility domain.PolicyID = "orientation.lifecycle.eligibility"
 	PolicyEvaluationConfidence domain.PolicyID = "orientation.evaluation.confidence"
-	PolicyEvaluationFreshness domain.PolicyID = "orientation.evaluation.freshness"
+	PolicyEvaluationFreshness  domain.PolicyID = "orientation.evaluation.freshness"
 )
 
 type evaluatorKey struct {
@@ -56,12 +56,12 @@ type Engine struct {
 
 func NewV0Engine() *Engine {
 	return &Engine{evaluators: map[evaluatorKey]evaluatorFunc{
-		{domain.PolicyEvaluatorCapacityLimit, domain.PolicyEvaluatorSemanticVersionV1}:       evaluateCapacityLimit,
-		{domain.PolicyEvaluatorRequiredEvaluation, domain.PolicyEvaluatorSemanticVersionV1}:  evaluateRequiredEvaluation,
+		{domain.PolicyEvaluatorCapacityLimit, domain.PolicyEvaluatorSemanticVersionV1}:        evaluateCapacityLimit,
+		{domain.PolicyEvaluatorRequiredEvaluation, domain.PolicyEvaluatorSemanticVersionV1}:   evaluateRequiredEvaluation,
 		{domain.PolicyEvaluatorLifecycleEligibility, domain.PolicyEvaluatorSemanticVersionV1}: evaluateLifecycleEligibility,
-		{domain.PolicyEvaluatorConfidenceGate, domain.PolicyEvaluatorSemanticVersionV1}:      evaluateConfidenceGate,
-		{domain.PolicyEvaluatorFreshnessRule, domain.PolicyEvaluatorSemanticVersionV1}:       evaluateFreshnessRule,
-		{domain.PolicyEvaluatorScoreMultiplier, domain.PolicyEvaluatorSemanticVersionV1}:     evaluateScoreMultiplier,
+		{domain.PolicyEvaluatorConfidenceGate, domain.PolicyEvaluatorSemanticVersionV1}:       evaluateConfidenceGate,
+		{domain.PolicyEvaluatorFreshnessRule, domain.PolicyEvaluatorSemanticVersionV1}:        evaluateFreshnessRule,
+		{domain.PolicyEvaluatorScoreMultiplier, domain.PolicyEvaluatorSemanticVersionV1}:      evaluateScoreMultiplier,
 	}}
 }
 
@@ -69,19 +69,19 @@ type BaselinePolicySetConfig struct {
 	ID                  domain.PolicySetVersionID
 	PolicySet           domain.PolicySet
 	CreatedAt           time.Time
-	MaxNext             int
+	MaxNext             *int
 	MinimumConfidence   domain.ConfidenceBand
 	FreshnessMaximumAge time.Duration
 }
 
 // NewBaselinePolicySetVersion constructs the offline UC-01 baseline. The now
-// capacity default is fixed at 3 by the accepted RFC; next defaults to 10.
-// Freshness remains explicit because the RFC intentionally does not prescribe a
-// universal stale-after duration.
+// capacity default is fixed at 3 by the accepted RFC. A nil MaxNext uses the
+// accepted initial default of 10; an explicit zero remains a valid zero-capacity
+// queue rather than being reinterpreted as an omitted value.
 func NewBaselinePolicySetVersion(config BaselinePolicySetConfig) (domain.PolicySetVersion, error) {
-	maxNext := config.MaxNext
-	if maxNext == 0 {
-		maxNext = 10
+	maxNext := 10
+	if config.MaxNext != nil {
+		maxNext = *config.MaxNext
 	}
 	if maxNext < 0 {
 		return domain.PolicySetVersion{}, fmt.Errorf("baseline next capacity must not be negative")
@@ -115,22 +115,61 @@ func NewBaselinePolicySetVersion(config BaselinePolicySetConfig) (domain.PolicyS
 		instances = append(instances, instance)
 		return nil
 	}
-	if err := appendInstance(domain.NewLifecycleEligibilityPolicyInstance("baseline-lifecycle-eligibility", PolicyLifecycleEligibility, domain.NewLifecycleEligibilityParameters(false), 10, "Normal active orientation excludes candidate and terminal lifecycle states.")); err != nil {
+	if err := appendInstance(domain.NewLifecycleEligibilityPolicyInstance(
+		"baseline-lifecycle-eligibility",
+		PolicyLifecycleEligibility,
+		domain.NewLifecycleEligibilityParameters(false),
+		10,
+		"Normal active orientation excludes candidate and terminal lifecycle states.",
+	)); err != nil {
 		return domain.PolicySetVersion{}, err
 	}
-	if err := appendInstance(domain.NewRequiredEvaluationPolicyInstance("baseline-evaluation-required", PolicyEvaluationRequired, 20, domain.PolicyMissingExcludeSubject, domain.PolicyNotExceptionable, "UC-01 requires an accepted evaluation before active orientation.")); err != nil {
+	if err := appendInstance(domain.NewRequiredEvaluationPolicyInstance(
+		"baseline-evaluation-required",
+		PolicyEvaluationRequired,
+		20,
+		domain.PolicyMissingExcludeSubject,
+		domain.PolicyNotExceptionable,
+		"UC-01 requires an accepted evaluation before active orientation.",
+	)); err != nil {
 		return domain.PolicySetVersion{}, err
 	}
-	if err := appendInstance(domain.NewConfidenceGatePolicyInstance("baseline-confidence", PolicyEvaluationConfidence, confidenceParameters, 30, domain.PolicyMissingRequireReview, "Weak evaluation evidence remains visible and requires review.")); err != nil {
+	if err := appendInstance(domain.NewConfidenceGatePolicyInstance(
+		"baseline-confidence",
+		PolicyEvaluationConfidence,
+		confidenceParameters,
+		30,
+		domain.PolicyMissingRequireReview,
+		"Weak evaluation evidence remains visible and requires review.",
+	)); err != nil {
 		return domain.PolicySetVersion{}, err
 	}
-	if err := appendInstance(domain.NewFreshnessRulePolicyInstance("baseline-freshness", PolicyEvaluationFreshness, freshnessParameters, 40, domain.PolicyMissingRequireReview, "Stale evaluation evidence requires explicit review.")); err != nil {
+	if err := appendInstance(domain.NewFreshnessRulePolicyInstance(
+		"baseline-freshness",
+		PolicyEvaluationFreshness,
+		freshnessParameters,
+		40,
+		domain.PolicyMissingRequireReview,
+		"Stale evaluation evidence requires explicit review.",
+	)); err != nil {
 		return domain.PolicySetVersion{}, err
 	}
-	if err := appendInstance(domain.NewCapacityLimitPolicyInstance("baseline-now-capacity", PolicyCapacityNow, nowParameters, 10, "Bound the now queue to the accepted default capacity.")); err != nil {
+	if err := appendInstance(domain.NewCapacityLimitPolicyInstance(
+		"baseline-now-capacity",
+		PolicyCapacityNow,
+		nowParameters,
+		10,
+		"Bound the now queue to the accepted default capacity.",
+	)); err != nil {
 		return domain.PolicySetVersion{}, err
 	}
-	if err := appendInstance(domain.NewCapacityLimitPolicyInstance("baseline-next-capacity", PolicyCapacityNext, nextParameters, 20, "Bound the next queue explicitly.")); err != nil {
+	if err := appendInstance(domain.NewCapacityLimitPolicyInstance(
+		"baseline-next-capacity",
+		PolicyCapacityNext,
+		nextParameters,
+		20,
+		"Bound the next queue explicitly.",
+	)); err != nil {
 		return domain.PolicySetVersion{}, err
 	}
 
@@ -175,11 +214,11 @@ type ProjectContext struct {
 }
 
 type CapacityContext struct {
-	OperationID  domain.OperationID
-	ProjectID    domain.ProjectID
-	Placement    domain.Placement
+	OperationID   domain.OperationID
+	ProjectID     domain.ProjectID
+	Placement     domain.Placement
 	SelectedCount int
-	EvaluatedAt  time.Time
+	EvaluatedAt   time.Time
 }
 
 type ExactMultiplier struct {
@@ -416,11 +455,21 @@ func (e *Engine) evaluateInstance(version domain.PolicySetVersion, instance doma
 	key := evaluatorKey{instance.EvaluatorType(), instance.EvaluatorVersion()}
 	evaluator, ok := e.evaluators[key]
 	if !ok {
-		return domain.PolicyDecision{}, &PolicyEvaluationFailure{InstanceID: instance.ID(), EvaluatorType: instance.EvaluatorType(), Version: instance.EvaluatorVersion(), Cause: fmt.Errorf("evaluator unavailable")}
+		return domain.PolicyDecision{}, &PolicyEvaluationFailure{
+			InstanceID:    instance.ID(),
+			EvaluatorType: instance.EvaluatorType(),
+			Version:       instance.EvaluatorVersion(),
+			Cause:         fmt.Errorf("evaluator unavailable"),
+		}
 	}
 	output, err := evaluator(instance, input)
 	if err != nil {
-		return domain.PolicyDecision{}, &PolicyEvaluationFailure{InstanceID: instance.ID(), EvaluatorType: instance.EvaluatorType(), Version: instance.EvaluatorVersion(), Cause: err}
+		return domain.PolicyDecision{}, &PolicyEvaluationFailure{
+			InstanceID:    instance.ID(),
+			EvaluatorType: instance.EvaluatorType(),
+			Version:       instance.EvaluatorVersion(),
+			Cause:         err,
+		}
 	}
 	decisionID := deterministicDecisionID(operationID, instance.ID(), projectID, discriminator)
 	decision, err := domain.NewPolicyDecision(domain.PolicyDecisionInput{
@@ -445,7 +494,12 @@ func (e *Engine) evaluateInstance(version domain.PolicySetVersion, instance doma
 		CreatedAt:            evaluatedAt,
 	})
 	if err != nil {
-		return domain.PolicyDecision{}, &PolicyEvaluationFailure{InstanceID: instance.ID(), EvaluatorType: instance.EvaluatorType(), Version: instance.EvaluatorVersion(), Cause: err}
+		return domain.PolicyDecision{}, &PolicyEvaluationFailure{
+			InstanceID:    instance.ID(),
+			EvaluatorType: instance.EvaluatorType(),
+			Version:       instance.EvaluatorVersion(),
+			Cause:         err,
+		}
 	}
 	return decision, nil
 }
@@ -459,8 +513,8 @@ func deterministicDecisionID(operationID domain.OperationID, instanceID domain.P
 func Compose(version domain.PolicySetVersion, decisions []domain.PolicyDecision) (CompositeOutcome, error) {
 	ordered := append([]domain.PolicyDecision(nil), decisions...)
 	sort.SliceStable(ordered, func(i, j int) bool {
-		if ordered[i].Phase() != ordered[j].Phase() {
-			return ordered[i].Phase() < ordered[j].Phase()
+		if phaseRank(ordered[i].Phase()) != phaseRank(ordered[j].Phase()) {
+			return phaseRank(ordered[i].Phase()) < phaseRank(ordered[j].Phase())
 		}
 		if ordered[i].Priority() != ordered[j].Priority() {
 			return ordered[i].Priority() < ordered[j].Priority()
@@ -526,6 +580,25 @@ func Compose(version domain.PolicySetVersion, decisions []domain.PolicyDecision)
 	return outcome, nil
 }
 
+func phaseRank(phase domain.PolicyPhase) int {
+	switch phase {
+	case domain.PolicyPhaseCandidateEligibility:
+		return 1
+	case domain.PolicyPhaseCandidateAdjustment:
+		return 2
+	case domain.PolicyPhaseSetConstraints:
+		return 3
+	case domain.PolicyPhaseResultValidation:
+		return 4
+	case domain.PolicyPhaseDispositionValidation:
+		return 5
+	case domain.PolicyPhaseReviewDiagnostics:
+		return 6
+	default:
+		return 100
+	}
+}
+
 func (e *Engine) ValidateExceptionUse(version domain.PolicySetVersion, exception domain.PolicyException, applications []domain.PolicyExceptionApplication, revocations []domain.PolicyExceptionRevocation, projectID domain.ProjectID, phase domain.PolicyPhase, at time.Time) error {
 	if at.IsZero() {
 		return fmt.Errorf("exception validation time must not be zero")
@@ -586,10 +659,18 @@ func evaluateCapacityLimit(instance domain.PolicyInstance, input evaluationInput
 		if input.selectedCount == nil {
 			missing = append(missing, "selected_count")
 		}
-		return evaluatorOutput{result: domain.PolicyDecisionIndeterminate, reasonCode: "capacity_input_missing", missingInputs: missing}, nil
+		return evaluatorOutput{
+			result:        domain.PolicyDecisionIndeterminate,
+			reasonCode:    "capacity_input_missing",
+			missingInputs: missing,
+		}, nil
 	}
 	if *input.placement != parameters.Placement() {
-		return evaluatorOutput{result: domain.PolicyDecisionNotApplicable, reasonCode: "capacity_other_placement", inputReferences: []string{"placement:" + string(*input.placement)}}, nil
+		return evaluatorOutput{
+			result:          domain.PolicyDecisionNotApplicable,
+			reasonCode:      "capacity_other_placement",
+			inputReferences: []string{"placement:" + string(*input.placement)},
+		}, nil
 	}
 	effect, err := domain.NewCapacityLimitPolicyEffect(parameters.Placement(), int(parameters.Maximum()))
 	if err != nil {
@@ -601,14 +682,28 @@ func evaluateCapacityLimit(instance domain.PolicyInstance, input evaluationInput
 		"maximum:" + strconv.FormatUint(uint64(parameters.Maximum()), 10),
 	}
 	if uint32(*input.selectedCount) >= parameters.Maximum() {
-		return evaluatorOutput{result: domain.PolicyDecisionDeny, effects: []domain.PolicyEffect{effect}, reasonCode: "capacity_exhausted", inputReferences: inputReferences}, nil
+		return evaluatorOutput{
+			result:          domain.PolicyDecisionDeny,
+			effects:         []domain.PolicyEffect{effect},
+			reasonCode:      "capacity_exhausted",
+			inputReferences: inputReferences,
+		}, nil
 	}
-	return evaluatorOutput{result: domain.PolicyDecisionAllow, effects: []domain.PolicyEffect{effect}, reasonCode: "capacity_available", inputReferences: inputReferences}, nil
+	return evaluatorOutput{
+		result:          domain.PolicyDecisionAllow,
+		effects:         []domain.PolicyEffect{effect},
+		reasonCode:      "capacity_available",
+		inputReferences: inputReferences,
+	}, nil
 }
 
 func evaluateRequiredEvaluation(_ domain.PolicyInstance, input evaluationInput) (evaluatorOutput, error) {
 	if input.evaluation == nil {
-		return evaluatorOutput{result: domain.PolicyDecisionIndeterminate, reasonCode: "accepted_evaluation_missing", missingInputs: []string{"accepted_evaluation"}}, nil
+		return evaluatorOutput{
+			result:        domain.PolicyDecisionIndeterminate,
+			reasonCode:    "accepted_evaluation_missing",
+			missingInputs: []string{"accepted_evaluation"},
+		}, nil
 	}
 	return evaluatorOutput{
 		result:          domain.PolicyDecisionAllow,
@@ -624,7 +719,11 @@ func evaluateLifecycleEligibility(instance domain.PolicyInstance, input evaluati
 		return evaluatorOutput{}, fmt.Errorf("lifecycle eligibility parameters missing")
 	}
 	if input.lifecycle == nil {
-		return evaluatorOutput{result: domain.PolicyDecisionIndeterminate, reasonCode: "lifecycle_state_missing", missingInputs: []string{"lifecycle_state"}}, nil
+		return evaluatorOutput{
+			result:        domain.PolicyDecisionIndeterminate,
+			reasonCode:    "lifecycle_state_missing",
+			missingInputs: []string{"lifecycle_state"},
+		}, nil
 	}
 	state := *input.lifecycle
 	if !state.Valid() {
@@ -654,7 +753,11 @@ func evaluateConfidenceGate(instance domain.PolicyInstance, input evaluationInpu
 		return evaluatorOutput{}, fmt.Errorf("confidence gate parameters missing")
 	}
 	if input.evaluation == nil {
-		return evaluatorOutput{result: domain.PolicyDecisionIndeterminate, reasonCode: "confidence_unavailable", missingInputs: []string{"accepted_evaluation"}}, nil
+		return evaluatorOutput{
+			result:        domain.PolicyDecisionIndeterminate,
+			reasonCode:    "confidence_unavailable",
+			missingInputs: []string{"accepted_evaluation"},
+		}, nil
 	}
 	band := input.evaluation.Confidence().Band()
 	diagnostic, err := domain.NewDiagnosticPolicyEffect("confidence_band", string(band))
@@ -682,7 +785,11 @@ func evaluateFreshnessRule(instance domain.PolicyInstance, input evaluationInput
 		return evaluatorOutput{}, fmt.Errorf("freshness rule parameters missing")
 	}
 	if input.evaluation == nil {
-		return evaluatorOutput{result: domain.PolicyDecisionIndeterminate, reasonCode: "freshness_unavailable", missingInputs: []string{"accepted_evaluation"}}, nil
+		return evaluatorOutput{
+			result:        domain.PolicyDecisionIndeterminate,
+			reasonCode:    "freshness_unavailable",
+			missingInputs: []string{"accepted_evaluation"},
+		}, nil
 	}
 	evidenceAsOf := input.evaluation.Freshness().EvidenceAsOf()
 	if input.asOf.Before(evidenceAsOf) {
