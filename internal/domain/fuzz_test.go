@@ -7,12 +7,12 @@ import (
 
 func FuzzNewPlacementRecommendation(f *testing.F) {
 	seeds := [][2]string{
-		{"project-1", string(PlacementNow)},
-		{"project-1", string(PlacementNext)},
-		{"project-1", string(PlacementLater)},
-		{"project-1", string(PlacementKill)},
-		{"", string(PlacementNow)},
-		{"   ", string(PlacementNext)},
+		{"project-1", "now"},
+		{"project-1", "next"},
+		{"project-1", "later"},
+		{"project-1", "kill"},
+		{"", "now"},
+		{"   ", "next"},
 		{"project-1", "invalid"},
 	}
 	for _, seed := range seeds {
@@ -24,7 +24,13 @@ func FuzzNewPlacementRecommendation(f *testing.F) {
 		placement := Placement(placementValue)
 		recommendation, err := NewPlacementRecommendation(projectID, placement)
 
-		wantValid := strings.TrimSpace(projectIDValue) != "" && placement.Valid()
+		placementValid := false
+		switch placementValue {
+		case "now", "next", "later", "kill":
+			placementValid = true
+		}
+		wantValid := strings.TrimSpace(projectIDValue) != "" && placementValid
+
 		if !wantValid {
 			if err == nil {
 				t.Fatalf("NewPlacementRecommendation(%q, %q) accepted invalid input", projectIDValue, placementValue)
