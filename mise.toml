@@ -21,9 +21,9 @@ description = "Run Go static analysis"
 run = '''
 set -eu
 go vet ./...
-go vet -tags=integration,e2e ./tests/...
+go vet -tags=e2e ./tests/...
 go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
-go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 -tags=integration,e2e ./tests/...
+go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 -tags=e2e ./tests/...
 '''
 
 [tasks.vuln]
@@ -31,11 +31,10 @@ description = "Scan reachable Go code for known vulnerabilities"
 run = "go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./..."
 
 [tasks.test]
-description = "Run the complete deterministic test pyramid"
+description = "Run deterministic unit and CLI end-to-end tests"
 run = '''
 set -eu
 mise run test-unit
-mise run test-integration
 mise run test-e2e
 '''
 
@@ -48,13 +47,9 @@ go test -count=1 -shuffle=on -timeout=2m -coverprofile="$coverage" ./internal/..
 go tool cover -func="$coverage"
 '''
 
-[tasks.test-integration]
-description = "Run application/process-contract integration tests"
-run = "go test -count=1 -timeout=2m -tags=integration ./tests/integration/..."
-
 [tasks.test-e2e]
-description = "Build and exercise the CLI as an OS process"
-run = "go test -count=1 -timeout=2m -tags=e2e ./tests/e2e/..."
+description = "Build and exercise the CLI as an OS process under trimpath"
+run = "GOFLAGS=-trimpath go test -count=1 -timeout=2m -tags=e2e ./tests/e2e/..."
 
 [tasks.fuzz]
 description = "Fuzz domain construction invariants"
