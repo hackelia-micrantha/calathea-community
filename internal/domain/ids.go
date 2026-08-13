@@ -17,9 +17,11 @@ type (
 	PolicySetVersionID           string
 	PolicySelectionID            string
 	PolicyID                     string
+	PolicyInstanceID             string
 	PolicyDecisionID             string
 	PolicyExceptionID            string
 	PolicyExceptionApplicationID string
+	PolicyExceptionRevocationID  string
 	OrientationRunID             string
 	OrientationDispositionID     string
 	LifecycleDecisionID          string
