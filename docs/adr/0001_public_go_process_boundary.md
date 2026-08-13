@@ -74,6 +74,14 @@ calathea-community (public executable core)
 
 The public repository must build and test without access to the private repository.
 
+## Provenance and licensing
+
+The initial executable-core files in this extraction were promoted from private `hackelia-micrantha/calathea` at commit `f1b5bdd625c7db890be2d024031d02b675e9b7e4`.
+
+The repository owner is intentionally publishing the promoted reusable source in `calathea-community` under this repository's MPL-2.0 license. The extraction changes repository/module identity and removes private-only references where required; it does not intentionally change deterministic domain semantics.
+
+Promoted tests and fixtures must pass the public-safety review tracked by #6 before the extraction is considered complete.
+
 ## Consequences
 
 ### Benefits
