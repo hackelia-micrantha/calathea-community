@@ -80,7 +80,7 @@ func (v ProjectVersion) CreatedAt() time.Time          { return v.createdAt }
 func (v ProjectVersion) Supersedes() *ProjectVersionID { return cloneProjectVersionID(v.supersedes) }
 
 // Evaluation is the stable identity of a project's evaluation history. Evaluation
-// axes and scoring are intentionally introduced by #26.
+// axes and scoring are defined by the evaluation semantic contract.
 type Evaluation struct {
 	id        EvaluationID
 	projectID ProjectID
@@ -114,7 +114,7 @@ func NewPolicySet(id PolicySetID) (PolicySet, error) {
 func (p PolicySet) ID() PolicySetID { return p.id }
 
 // PolicySetVersion identifies one immutable fully resolved policy configuration.
-// Policy instances are introduced by #27.
+// Policy instances are introduced by the policy semantic contract.
 type PolicySetVersion struct {
 	id          PolicySetVersionID
 	policySetID PolicySetID
