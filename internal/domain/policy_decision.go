@@ -195,6 +195,15 @@ func NewPolicyDecision(input PolicyDecisionInput) (PolicyDecision, error) {
 	if err := validateUniqueStrings("policy missing input", input.MissingInputs); err != nil {
 		return PolicyDecision{}, err
 	}
+	requiredSet := make(map[string]struct{}, len(input.RequiredInputs))
+	for _, required := range input.RequiredInputs {
+		requiredSet[required] = struct{}{}
+	}
+	for _, missing := range input.MissingInputs {
+		if _, ok := requiredSet[missing]; !ok {
+			return PolicyDecision{}, fmt.Errorf("policy missing input %q is not declared in required inputs", missing)
+		}
+	}
 	if input.Result == PolicyDecisionIndeterminate && len(input.MissingInputs) == 0 && len(input.ConflictingEvidenceIDs) == 0 {
 		return PolicyDecision{}, fmt.Errorf("indeterminate policy decision requires missing or conflicting input evidence")
 	}
@@ -293,12 +302,12 @@ func (d PolicyDecision) MissingInputs() []string { return cloneStrings(d.missing
 func (d PolicyDecision) MissingInputBehavior() PolicyMissingInputBehavior {
 	return d.missingInputBehavior
 }
-func (d PolicyDecision) Rationale() string                   { return d.rationale }
-func (d PolicyDecision) ReasonCode() string                  { return d.reasonCode }
-func (d PolicyDecision) Priority() int                       { return d.priority }
-func (d PolicyDecision) ConflictKey() string                 { return d.conflictKey }
-func (d PolicyDecision) ExceptionID() *PolicyExceptionID     { return clonePolicyExceptionID(d.exceptionID) }
-func (d PolicyDecision) CreatedAt() time.Time                { return d.createdAt }
+func (d PolicyDecision) Rationale() string               { return d.rationale }
+func (d PolicyDecision) ReasonCode() string              { return d.reasonCode }
+func (d PolicyDecision) Priority() int                   { return d.priority }
+func (d PolicyDecision) ConflictKey() string             { return d.conflictKey }
+func (d PolicyDecision) ExceptionID() *PolicyExceptionID { return clonePolicyExceptionID(d.exceptionID) }
+func (d PolicyDecision) CreatedAt() time.Time            { return d.createdAt }
 
 func clonePolicyEffects(values []PolicyEffect) []PolicyEffect {
 	if len(values) == 0 {
