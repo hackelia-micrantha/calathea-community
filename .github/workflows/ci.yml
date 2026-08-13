@@ -30,14 +30,14 @@ jobs:
       - name: Verify formatting
         run: mise run format-check
 
+      - name: SQLite persistence spike (CGO disabled)
+        run: mise run sqlite-spike
+
       - name: Static analysis
         run: mise run static
 
       - name: Unit tests and coverage
         run: mise run test-unit
-
-      - name: SQLite persistence spike (CGO disabled)
-        run: mise run sqlite-spike
 
       - name: End-to-end CLI tests
         run: mise run test-e2e
