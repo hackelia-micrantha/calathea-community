@@ -133,9 +133,14 @@ func TestPolicyDecisionCopiesEffectsEvidenceAndInputTrace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCapacityPolicyEffect() error = %v", err)
 	}
+	selectedCount, err := NewPolicyInputReference(PolicyInputSelectedCount, "3")
+	if err != nil {
+		t.Fatalf("NewPolicyInputReference() error = %v", err)
+	}
 	evidence := []EvidenceReferenceID{"evidence-1"}
 	effects := []PolicyEffect{effect}
 	requiredInputs := []PolicyInputKind{PolicyInputSelectedCount}
+	inputReferences := []PolicyInputReference{selectedCount}
 
 	decision, err := NewPolicyDecision(PolicyDecisionInput{
 		ID:                   PolicyDecisionID("decision-1"),
@@ -150,8 +155,9 @@ func TestPolicyDecisionCopiesEffectsEvidenceAndInputTrace(t *testing.T) {
 		Subject:              subject,
 		OperationID:          OperationID("op-1"),
 		Result:               PolicyDecisionAllow,
-		ReasonCode:           "capacity_available",
+		ReasonCode:           "capacity_satisfied",
 		RequiredInputs:       requiredInputs,
+		InputReferences:      inputReferences,
 		EvidenceIDs:          evidence,
 		Effects:              effects,
 		Priority:             30,
@@ -165,14 +171,20 @@ func TestPolicyDecisionCopiesEffectsEvidenceAndInputTrace(t *testing.T) {
 	evidence[0] = EvidenceReferenceID("changed")
 	effects[0] = PolicyEffect{}
 	requiredInputs[0] = PolicyInputLifecycleState
-	returned := decision.Effects()
-	returned[0] = PolicyEffect{}
+	inputReferences[0] = PolicyInputReference{}
+	returnedEffects := decision.Effects()
+	returnedEffects[0] = PolicyEffect{}
+	returnedReferences := decision.InputReferences()
+	returnedReferences[0] = PolicyInputReference{}
 
 	if got := decision.EvidenceIDs()[0]; got != EvidenceReferenceID("evidence-1") {
 		t.Fatalf("stored evidence changed to %q", got)
 	}
 	if got := decision.RequiredInputs()[0]; got != PolicyInputSelectedCount {
 		t.Fatalf("stored required input changed to %q", got)
+	}
+	if got := decision.InputReferences()[0]; got.Kind() != PolicyInputSelectedCount || got.Value() != "3" {
+		t.Fatalf("stored input reference = %#v, want selected_count=3", got)
 	}
 	stored := decision.Effects()[0]
 	if got, want := stored.Type(), PolicyEffectCapacityLimit; got != want {
@@ -210,5 +222,34 @@ func TestPolicyDecisionRejectsUndeclaredMissingInput(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("policy decision accepted a missing input not declared by the evaluator contract")
+	}
+}
+
+func TestPolicyDecisionRejectsApplicableResultWithoutRequiredInputReference(t *testing.T) {
+	subject, err := NewProjectPolicySubject(ProjectID("project-1"))
+	if err != nil {
+		t.Fatalf("NewProjectPolicySubject() error = %v", err)
+	}
+	_, err = NewPolicyDecision(PolicyDecisionInput{
+		ID:                   PolicyDecisionID("decision-1"),
+		PolicySetVersionID:   PolicySetVersionID("policy-set-v1"),
+		PolicyID:             PolicyID("orientation.evaluation.required"),
+		PolicyInstanceID:     PolicyInstanceID("evaluation-required"),
+		EvaluatorType:        PolicyEvaluatorRequiredEvaluation,
+		EvaluatorVersion:     "1",
+		Phase:                PolicyPhaseCandidateEligibility,
+		EffectClass:          PolicyEffectHard,
+		MissingInputBehavior: PolicyMissingInputExcludeSubject,
+		Subject:              subject,
+		OperationID:          OperationID("op-1"),
+		Result:               PolicyDecisionAllow,
+		ReasonCode:           "accepted_evaluation_present",
+		RequiredInputs:       []PolicyInputKind{PolicyInputAcceptedEvaluation},
+		Priority:             20,
+		Rationale:            "accepted evaluation required",
+		CreatedAt:            testTime(),
+	})
+	if err == nil {
+		t.Fatal("policy decision accepted applicable result without required input reference")
 	}
 }
