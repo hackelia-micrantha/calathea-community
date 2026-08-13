@@ -100,7 +100,7 @@ func (p PolicyInstance) RequiredInputs() []string {
 	case PolicyEvaluatorFreshnessRule:
 		return []string{"accepted_evaluation", "evaluation_evidence_as_of", "policy_evaluation_time"}
 	case PolicyEvaluatorScoreMultiplier:
-		return []string{"effective_score"}
+		return []string{"accepted_evaluation", "base_score"}
 	default:
 		return nil
 	}
