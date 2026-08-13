@@ -219,7 +219,8 @@ func sameInputKinds(left, right []domain.PolicyInputKind) bool {
 
 // Evaluate runs one exact configured policy instance. Valid missing input yields
 // an indeterminate PolicyDecision; unsupported evaluator/runtime conditions return
-// EvaluationFailure instead.
+// EvaluationFailure instead. Missing-input behavior is retained on the decision
+// and interpreted only by deterministic composition.
 func Evaluate(request Request) (domain.PolicyDecision, error) {
 	instance, err := findInstance(request.PolicySet, request.InstanceID)
 	if err != nil {
@@ -229,7 +230,7 @@ func Evaluate(request Request) (domain.PolicyDecision, error) {
 		return domain.PolicyDecision{}, failure(instance, "unsupported_evaluator_version", nil)
 	}
 	if request.Context.Subject.Type() != instance.SubjectType() {
-		return makeDecision(request, instance, domain.PolicyDecisionNotApplicable, "subject_type_not_applicable", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionNotApplicable, "subject_type_not_applicable", nil, nil)
 	}
 
 	switch instance.EvaluatorType() {
@@ -259,7 +260,7 @@ func findInstance(version domain.PolicySetVersion, instanceID domain.PolicyInsta
 
 func evaluateLifecycle(request Request, instance domain.PolicyInstance) (domain.PolicyDecision, error) {
 	if request.Context.LifecycleState == nil {
-		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_lifecycle_state", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_lifecycle_state", []domain.PolicyInputKind{domain.PolicyInputLifecycleState}, nil)
 	}
 	state := *request.Context.LifecycleState
 	if !state.Valid() {
@@ -268,14 +269,14 @@ func evaluateLifecycle(request Request, instance domain.PolicyInstance) (domain.
 	allowProposed, _ := instance.Parameters().AllowProposed()
 	switch state {
 	case domain.LifecycleApproved, domain.LifecycleActive, domain.LifecyclePaused:
-		return makeDecision(request, instance, domain.PolicyDecisionAllow, "lifecycle_eligible", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionAllow, "lifecycle_eligible", nil, nil)
 	case domain.LifecycleProposed:
 		if allowProposed {
-			return makeDecision(request, instance, domain.PolicyDecisionAllow, "proposed_lifecycle_allowed", nil)
+			return makeDecision(request, instance, domain.PolicyDecisionAllow, "proposed_lifecycle_allowed", nil, nil)
 		}
-		return makeDecision(request, instance, domain.PolicyDecisionDeny, "proposed_lifecycle_not_allowed", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionDeny, "proposed_lifecycle_not_allowed", nil, nil)
 	case domain.LifecycleCandidate, domain.LifecycleCompleted, domain.LifecycleCancelled, domain.LifecycleArchived:
-		return makeDecision(request, instance, domain.PolicyDecisionDeny, "lifecycle_ineligible", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionDeny, "lifecycle_ineligible", nil, nil)
 	default:
 		return domain.PolicyDecision{}, failure(instance, "invalid_lifecycle_state", fmt.Errorf("state %q is unsupported", state))
 	}
@@ -283,18 +284,18 @@ func evaluateLifecycle(request Request, instance domain.PolicyInstance) (domain.
 
 func evaluateRequiredEvaluation(request Request, instance domain.PolicyInstance) (domain.PolicyDecision, error) {
 	if request.Context.Evaluation == nil {
-		return makeDecision(request, instance, domain.PolicyDecisionDeny, "missing_accepted_evaluation", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_accepted_evaluation", []domain.PolicyInputKind{domain.PolicyInputAcceptedEvaluation}, nil)
 	}
-	return makeDecision(request, instance, domain.PolicyDecisionAllow, "accepted_evaluation_present", nil)
+	return makeDecision(request, instance, domain.PolicyDecisionAllow, "accepted_evaluation_present", nil, nil)
 }
 
 func evaluateCapacity(request Request, instance domain.PolicyInstance) (domain.PolicyDecision, error) {
 	placement, _ := instance.Parameters().Placement()
 	if request.Context.Subject.ID() != string(placement) {
-		return makeDecision(request, instance, domain.PolicyDecisionNotApplicable, "placement_set_not_applicable", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionNotApplicable, "placement_set_not_applicable", nil, nil)
 	}
 	if request.Context.SelectedCount == nil {
-		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_selected_count", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_selected_count", []domain.PolicyInputKind{domain.PolicyInputSelectedCount}, nil)
 	}
 	if *request.Context.SelectedCount < 0 {
 		return domain.PolicyDecision{}, failure(instance, "invalid_selected_count", fmt.Errorf("selected count %d must not be negative", *request.Context.SelectedCount))
@@ -304,15 +305,15 @@ func evaluateCapacity(request Request, instance domain.PolicyInstance) (domain.P
 	if err != nil {
 		return domain.PolicyDecision{}, failure(instance, "invalid_capacity_effect", err)
 	}
-	if *request.Context.SelectedCount > maximum {
-		return makeDecision(request, instance, domain.PolicyDecisionDeny, "capacity_exceeded", []domain.PolicyEffect{effect})
+	if *request.Context.SelectedCount >= maximum {
+		return makeDecision(request, instance, domain.PolicyDecisionDeny, "capacity_exhausted", nil, []domain.PolicyEffect{effect})
 	}
-	return makeDecision(request, instance, domain.PolicyDecisionAllow, "capacity_satisfied", []domain.PolicyEffect{effect})
+	return makeDecision(request, instance, domain.PolicyDecisionAllow, "capacity_available", nil, []domain.PolicyEffect{effect})
 }
 
 func evaluateConfidence(request Request, instance domain.PolicyInstance) (domain.PolicyDecision, error) {
 	if request.Context.Evaluation == nil {
-		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_accepted_evaluation", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_accepted_evaluation", []domain.PolicyInputKind{domain.PolicyInputAcceptedEvaluation}, nil)
 	}
 	threshold, _ := instance.Parameters().ConfidenceReviewBelowBasisPoints()
 	if int(request.Context.Evaluation.Confidence().BasisPoints()) < threshold {
@@ -320,17 +321,17 @@ func evaluateConfidence(request Request, instance domain.PolicyInstance) (domain
 		if err != nil {
 			return domain.PolicyDecision{}, failure(instance, "invalid_review_effect", err)
 		}
-		return makeDecision(request, instance, domain.PolicyDecisionRequireReview, "confidence_below_review_threshold", []domain.PolicyEffect{effect})
+		return makeDecision(request, instance, domain.PolicyDecisionRequireReview, "confidence_below_review_threshold", nil, []domain.PolicyEffect{effect})
 	}
-	return makeDecision(request, instance, domain.PolicyDecisionAllow, "confidence_sufficient", nil)
+	return makeDecision(request, instance, domain.PolicyDecisionAllow, "confidence_sufficient", nil, nil)
 }
 
 func evaluateFreshness(request Request, instance domain.PolicyInstance) (domain.PolicyDecision, error) {
 	if request.Context.Evaluation == nil {
-		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_accepted_evaluation", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_accepted_evaluation", []domain.PolicyInputKind{domain.PolicyInputAcceptedEvaluation}, nil)
 	}
 	if request.Context.AsOf.IsZero() {
-		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_as_of_time", nil)
+		return makeDecision(request, instance, domain.PolicyDecisionIndeterminate, "missing_as_of_time", []domain.PolicyInputKind{domain.PolicyInputAsOfTime}, nil)
 	}
 	evidenceAsOf := request.Context.Evaluation.Freshness().EvidenceAsOf()
 	if request.Context.AsOf.Before(evidenceAsOf) {
@@ -343,12 +344,12 @@ func evaluateFreshness(request Request, instance domain.PolicyInstance) (domain.
 		if err != nil {
 			return domain.PolicyDecision{}, failure(instance, "invalid_review_effect", err)
 		}
-		return makeDecision(request, instance, domain.PolicyDecisionRequireReview, "evaluation_stale", []domain.PolicyEffect{effect})
+		return makeDecision(request, instance, domain.PolicyDecisionRequireReview, "evaluation_stale", nil, []domain.PolicyEffect{effect})
 	}
-	return makeDecision(request, instance, domain.PolicyDecisionAllow, "evaluation_fresh", nil)
+	return makeDecision(request, instance, domain.PolicyDecisionAllow, "evaluation_fresh", nil, nil)
 }
 
-func makeDecision(request Request, instance domain.PolicyInstance, result domain.PolicyDecisionResult, reasonCode string, effects []domain.PolicyEffect) (domain.PolicyDecision, error) {
+func makeDecision(request Request, instance domain.PolicyInstance, result domain.PolicyDecisionResult, reasonCode string, missingInputs []domain.PolicyInputKind, effects []domain.PolicyEffect) (domain.PolicyDecision, error) {
 	return domain.NewPolicyDecision(domain.PolicyDecisionInput{
 		ID:                   request.DecisionID,
 		PolicySetVersionID:   request.PolicySet.ID(),
@@ -363,8 +364,12 @@ func makeDecision(request Request, instance domain.PolicyInstance, result domain
 		OperationID:          request.OperationID,
 		Result:               result,
 		ReasonCode:           reasonCode,
+		RequiredInputs:       instance.RequiredInputs(),
+		MissingInputs:        missingInputs,
 		EvidenceIDs:          request.Context.EvidenceIDs,
 		Effects:              effects,
+		Priority:             instance.Priority(),
+		Rationale:            instance.Rationale(),
 		CreatedAt:            request.CreatedAt,
 	})
 }
