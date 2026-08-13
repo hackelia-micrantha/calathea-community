@@ -144,6 +144,9 @@ func ValidateForActivation(version domain.PolicySetVersion) error {
 		if instance.EvaluatorVersion() != EvaluatorSemanticVersionV1 {
 			return fmt.Errorf("policy %q uses unsupported evaluator version %q", instance.PolicyID(), instance.EvaluatorVersion())
 		}
+		if instance.MissingInputBehavior() == domain.PolicyMissingInputDiagnosticOnly && instance.EffectClass() != domain.PolicyEffectAdvisory {
+			return fmt.Errorf("policy %q uses diagnostic_only missing-input behavior outside advisory effect class", instance.PolicyID())
+		}
 		if prior, exists := seenPolicy[instance.PolicyID()]; exists {
 			return fmt.Errorf("policy %q appears in both instances %q and %q", instance.PolicyID(), prior, instance.ID())
 		}
