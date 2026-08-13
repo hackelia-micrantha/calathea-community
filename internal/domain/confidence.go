@@ -38,6 +38,15 @@ const (
 	ConfidenceExceptionalEvidence ConfidenceBand = "exceptional_evidence"
 )
 
+func (b ConfidenceBand) Valid() bool {
+	switch b {
+	case ConfidenceWeakEvidence, ConfidenceVisibleUncertainty, ConfidenceWellSupported, ConfidenceExceptionalEvidence:
+		return true
+	default:
+		return false
+	}
+}
+
 func (c Confidence) Band() ConfidenceBand {
 	switch {
 	case c.basisPoints < 4000:
