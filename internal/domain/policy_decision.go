@@ -26,11 +26,10 @@ func (r PolicyDecisionResult) Valid() bool {
 }
 
 // PolicyDecision is the immutable deterministic result of applying one policy
-// instance to one project in an operation.
-//
-// #25 establishes the record/reference contract. #27 adds the public constructor,
-// evaluator identity/version, typed bounded adjustment effects, missing-input
-// semantics, and full applicability validation before these records are emitted.
+// instance to one project in an operation. The current type establishes the
+// record/reference contract; construction remains unavailable until evaluator
+// identity/version, bounded adjustment effects, missing-input semantics, and full
+// applicability validation are implemented.
 type PolicyDecision struct {
 	id                 PolicyDecisionID
 	policySetVersionID PolicySetVersionID
