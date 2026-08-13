@@ -323,6 +323,9 @@ func TestLifecycleEvaluator(t *testing.T) {
 	if got := decision.Result(); got != domain.PolicyDecisionIndeterminate {
 		t.Fatalf("missing lifecycle Result() = %q, want %q", got, domain.PolicyDecisionIndeterminate)
 	}
+	if got := decision.MissingInputs(); len(got) != 1 || got[0] != domain.PolicyInputLifecycleState {
+		t.Fatalf("missing lifecycle inputs = %#v", got)
+	}
 }
 
 func TestRequiredEvaluationEvaluator(t *testing.T) {
@@ -332,8 +335,14 @@ func TestRequiredEvaluationEvaluator(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Evaluate(missing evaluation) error = %v", err)
 	}
-	if got := decision.Result(); got != domain.PolicyDecisionDeny {
-		t.Fatalf("missing evaluation Result() = %q, want %q", got, domain.PolicyDecisionDeny)
+	if got := decision.Result(); got != domain.PolicyDecisionIndeterminate {
+		t.Fatalf("missing evaluation Result() = %q, want %q", got, domain.PolicyDecisionIndeterminate)
+	}
+	if got := decision.MissingInputBehavior(); got != domain.PolicyMissingInputExcludeSubject {
+		t.Fatalf("missing-input behavior = %q, want %q", got, domain.PolicyMissingInputExcludeSubject)
+	}
+	if got := decision.MissingInputs(); len(got) != 1 || got[0] != domain.PolicyInputAcceptedEvaluation {
+		t.Fatalf("missing evaluation inputs = %#v", got)
 	}
 
 	evaluation := testEvaluation(t, 7000, policyTestTime())
@@ -350,26 +359,26 @@ func TestRequiredEvaluationEvaluator(t *testing.T) {
 func TestCapacityEvaluator(t *testing.T) {
 	set := baselinePolicySet(t)
 	req := request(t, set, domain.PolicyInstanceID("capacity-now-default"), placementSubject(t, domain.PlacementNow))
-	count := 3
+	count := 2
 	req.Context.SelectedCount = &count
 	decision, err := Evaluate(req)
 	if err != nil {
-		t.Fatalf("Evaluate(capacity satisfied) error = %v", err)
+		t.Fatalf("Evaluate(capacity available) error = %v", err)
 	}
 	if got := decision.Result(); got != domain.PolicyDecisionAllow {
-		t.Fatalf("capacity satisfied Result() = %q, want %q", got, domain.PolicyDecisionAllow)
+		t.Fatalf("capacity available Result() = %q, want %q", got, domain.PolicyDecisionAllow)
 	}
 	if len(decision.Effects()) != 1 {
 		t.Fatalf("capacity effects = %d, want 1", len(decision.Effects()))
 	}
 
-	count = 4
+	count = 3
 	decision, err = Evaluate(req)
 	if err != nil {
-		t.Fatalf("Evaluate(capacity exceeded) error = %v", err)
+		t.Fatalf("Evaluate(capacity exhausted) error = %v", err)
 	}
 	if got := decision.Result(); got != domain.PolicyDecisionDeny {
-		t.Fatalf("capacity exceeded Result() = %q, want %q", got, domain.PolicyDecisionDeny)
+		t.Fatalf("capacity exhausted Result() = %q, want %q", got, domain.PolicyDecisionDeny)
 	}
 
 	other := request(t, set, domain.PolicyInstanceID("capacity-now-default"), placementSubject(t, domain.PlacementNext))
@@ -427,6 +436,9 @@ func TestFreshnessEvaluatorRequiresReviewForStaleEvidence(t *testing.T) {
 	}
 	if got := decision.Result(); got != domain.PolicyDecisionIndeterminate {
 		t.Fatalf("missing as-of Result() = %q, want %q", got, domain.PolicyDecisionIndeterminate)
+	}
+	if got := decision.MissingInputs(); len(got) != 1 || got[0] != domain.PolicyInputAsOfTime {
+		t.Fatalf("missing freshness inputs = %#v", got)
 	}
 }
 
