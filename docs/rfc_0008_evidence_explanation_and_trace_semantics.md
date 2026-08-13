@@ -307,6 +307,8 @@ Evidence references use an explicit availability state:
 
 Unavailable evidence is not silently omitted from explanations.
 
+Evidence availability and operation replay status are separate dimensions. An unavailable evidence reference can contribute to `partially_reproducible` or `not_reproducible`, but only RFC 0005 replay semantics determine the operation-level status.
+
 ## Freshness
 
 Freshness is derived from a versioned rule and explicit timestamps. It is not an intrinsic permanent property of evidence.
@@ -372,6 +374,14 @@ A human decision may choose a position but must not erase the contradiction from
 
 ## Deterministic replay contract
 
+RFC 0005 owns the canonical operation-level replay-status vocabulary:
+
+- `reproduced`;
+- `partially_reproducible`;
+- `not_reproducible`;
+- `invalidated`;
+- `not_applicable`.
+
 A deterministic operation is replayable only when its trace or referenced records identify:
 
 - complete immutable canonical inputs;
@@ -385,7 +395,17 @@ A deterministic operation is replayable only when its trace or referenced record
 
 Replay produces equivalent domain output, not necessarily identical timestamps or randomly assigned identifiers.
 
-If required evidence content is unavailable, redacted, deleted, or externally changed without retained identity, replay reports `not_reproducible` or `partially_reproducible`; it does not substitute current content silently.
+Evidence availability maps into replay status as follows:
+
+- all required retained inputs/evidence available and valid, with equivalent deterministic output -> `reproduced`;
+- one or more required inputs/evidence unavailable, but an actually executed and clearly delimited deterministic subset can be reproduced -> `partially_reproducible`;
+- required inputs/evidence unavailable and no meaningful deterministic subset sufficient for a replay claim can be completed -> `not_reproducible`;
+- required retained content fails integrity or semantic validation, including `integrity_mismatch` -> `invalidated`;
+- the operation is nondeterministic by definition, such as AI inference -> `not_applicable`.
+
+Missing/redacted/deleted evidence by itself does not justify `partially_reproducible`. The replay trace must record which deterministic subset was actually replayed and the boundary preventing full reproduction.
+
+Current external content is never substituted silently for unavailable historical evidence.
 
 ## AI provenance and reproducibility
 
@@ -403,7 +423,7 @@ An AI invocation trace records, subject to retention policy:
 
 Raw prompts and model output are retained only when explicitly permitted and necessary.
 
-Reinvoking a provider is a new nondeterministic operation. It is never proof that the original invocation can be replayed.
+Reinvoking a provider is a new nondeterministic operation. Its deterministic replay status is `not_applicable`; reinvocation is never partial or full reproduction of the original model result.
 
 AI-produced claims must distinguish quoted/source-backed material from generated interpretation.
 
@@ -460,7 +480,7 @@ Adds:
 - semantic versions;
 - redaction/retention states;
 - causal and supersession links;
-- reproducibility status.
+- canonical replay status and, for partial reproduction, the replayed subset boundary.
 
 Views are projections over the same underlying records. They must not invent materially different reasons.
 
@@ -502,6 +522,8 @@ A partial trace identifies:
 - retry/idempotency identity;
 - redaction or retention constraints.
 
+A partial operation trace is not the same concept as `partially_reproducible`. The latter requires an actual replay of a deterministic subset under RFC 0005.
+
 A failed operation must not appear as a complete successful trace.
 
 ## Integrity expectations
@@ -541,7 +563,7 @@ Golden tests must cover:
 - AI recommendation draft separated from later acceptance;
 - valid, expired, revoked, and overused policy exceptions through separate application records;
 - partial operation failure;
-- deterministic replay and not-reproducible outcomes.
+- each canonical replay status, including an actually replayed deterministic subset for `partially_reproducible`.
 
 ## Consequences
 
@@ -549,7 +571,7 @@ Golden tests must cover:
 
 - Cross-workflow explanations share one vocabulary.
 - Concise UX and deep audit views remain compatible.
-- Deterministic replay requirements are explicit.
+- Deterministic replay requirements and status values are explicit.
 - AI provenance does not pretend determinism.
 - Redaction and deletion remain visible without leaking content.
 - Policy exceptions and applications preserve immutability.
@@ -582,7 +604,8 @@ This RFC is accepted because:
 - confidence fields declare type and are not implied probabilities;
 - missing and contradictory evidence produce explicit diagnostics;
 - deterministic traces identify sufficient replay inputs and semantic versions;
-- AI reinvocation is explicitly non-replayable;
+- evidence availability maps deterministically into RFC 0005 replay statuses without conflating unavailable evidence with partial reproduction;
+- AI reinvocation is explicitly `not_applicable` to deterministic replay;
 - approvals, overrides, lifecycle decisions, and exceptions are attributable;
 - policy-exception application/use is separate from the immutable exception;
 - redaction and deletion report their impact on explanation and replay;
