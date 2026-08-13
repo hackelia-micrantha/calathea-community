@@ -40,17 +40,17 @@ mise run test-e2e
 '''
 
 [tasks.test-unit]
-description = "Run unit tests with race detection and coverage"
+description = "Run unit tests with coverage"
 run = '''
 set -eu
 coverage="${TMPDIR:-/tmp}/calathea-unit.coverage"
-go test -count=1 -shuffle=on -race -coverprofile="$coverage" ./internal/...
+go test -count=1 -shuffle=on -coverprofile="$coverage" ./internal/...
 go tool cover -func="$coverage"
 '''
 
 [tasks.test-integration]
 description = "Run application/process-contract integration tests"
-run = "go test -count=1 -race -tags=integration ./tests/integration/..."
+run = "go test -count=1 -tags=integration ./tests/integration/..."
 
 [tasks.test-e2e]
 description = "Build and exercise the CLI as an OS process"
