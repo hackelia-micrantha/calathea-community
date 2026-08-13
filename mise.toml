@@ -83,7 +83,12 @@ go mod tidy
 module_changes="$(git status --porcelain -- go.mod go.sum)"
 if [ -n "$module_changes" ]; then
   printf 'go mod tidy changed module metadata:\n%s\n' "$module_changes" >&2
-  git diff -- go.mod go.sum >&2 || true
+  printf '%s\n' '--- generated go.mod ---' >&2
+  cat go.mod >&2
+  if [ -f go.sum ]; then
+    printf '%s\n' '--- generated go.sum ---' >&2
+    cat go.sum >&2
+  fi
   exit 1
 fi
 go mod verify
