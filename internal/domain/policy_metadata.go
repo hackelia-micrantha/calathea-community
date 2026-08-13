@@ -1,6 +1,9 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 const (
 	PolicyConfigurationSchemaVersionV1 = "policy.instance.v1"
@@ -43,6 +46,7 @@ func NewProjectPolicySubjectSelector(projectIDs []ProjectID) (PolicySubjectSelec
 		seen[projectID] = struct{}{}
 		values = append(values, projectID)
 	}
+	sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
 	return PolicySubjectSelector{projectIDs: values}, nil
 }
 
@@ -57,12 +61,8 @@ func (s PolicySubjectSelector) MatchesProject(projectID ProjectID) bool {
 	if len(s.projectIDs) == 0 {
 		return true
 	}
-	for _, candidate := range s.projectIDs {
-		if candidate == projectID {
-			return true
-		}
-	}
-	return false
+	index := sort.Search(len(s.projectIDs), func(i int) bool { return s.projectIDs[i] >= projectID })
+	return index < len(s.projectIDs) && s.projectIDs[index] == projectID
 }
 
 // ConfigurationSchemaVersion is explicit even though v0 supports one schema.
@@ -98,7 +98,7 @@ func (p PolicyInstance) RequiredInputs() []string {
 	case PolicyEvaluatorConfidenceGate:
 		return []string{"accepted_evaluation", "confidence_band"}
 	case PolicyEvaluatorFreshnessRule:
-		return []string{"accepted_evaluation", "evaluation_evidence_as_of", "policy_evaluation_time"}
+		return []string{"accepted_evaluation", "evaluation_evidence_as_of", "planning_horizon", "policy_evaluation_time"}
 	case PolicyEvaluatorScoreMultiplier:
 		return []string{"accepted_evaluation", "base_score"}
 	default:
