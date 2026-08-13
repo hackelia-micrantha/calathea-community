@@ -148,13 +148,17 @@ func baselinePolicySet(t *testing.T) domain.PolicySetVersion {
 	return version
 }
 
-func projectSubject(t *testing.T) domain.PolicySubject {
+func projectSubjectFor(t *testing.T, projectID domain.ProjectID) domain.PolicySubject {
 	t.Helper()
-	subject, err := domain.NewProjectPolicySubject(domain.ProjectID("project-1"))
+	subject, err := domain.NewProjectPolicySubject(projectID)
 	if err != nil {
 		t.Fatalf("NewProjectPolicySubject() error = %v", err)
 	}
 	return subject
+}
+
+func projectSubject(t *testing.T) domain.PolicySubject {
+	return projectSubjectFor(t, domain.ProjectID("project-1"))
 }
 
 func placementSubject(t *testing.T, placement domain.Placement) domain.PolicySubject {
@@ -166,14 +170,13 @@ func placementSubject(t *testing.T, placement domain.Placement) domain.PolicySub
 	return subject
 }
 
-func testEvaluation(t *testing.T, confidenceBasisPoints int, evidenceAsOf time.Time) domain.EvaluationVersion {
+func testEvaluationForProject(t *testing.T, projectID domain.ProjectID, confidenceBasisPoints int, evidenceAsOf time.Time, evidenceIDs ...domain.EvidenceReferenceID) domain.EvaluationVersion {
 	t.Helper()
-	projectID := domain.ProjectID("project-1")
-	evaluation, err := domain.NewEvaluation(domain.EvaluationID("evaluation-1"), projectID)
+	evaluation, err := domain.NewEvaluation(domain.EvaluationID("evaluation-"+string(projectID)), projectID)
 	if err != nil {
 		t.Fatalf("NewEvaluation() error = %v", err)
 	}
-	projectVersion, err := domain.NewProjectVersion(domain.ProjectVersionID("project-v1"), projectID, "Test project", policyTestTime(), nil)
+	projectVersion, err := domain.NewProjectVersion(domain.ProjectVersionID("version-"+string(projectID)), projectID, "Test project", policyTestTime(), nil)
 	if err != nil {
 		t.Fatalf("NewProjectVersion() error = %v", err)
 	}
@@ -208,7 +211,7 @@ func testEvaluation(t *testing.T, confidenceBasisPoints int, evidenceAsOf time.T
 		t.Fatalf("NewMaintainerActor() error = %v", err)
 	}
 	version, err := domain.NewEvaluationVersion(domain.EvaluationVersionInput{
-		ID:                     domain.EvaluationVersionID("evaluation-v1"),
+		ID:                     domain.EvaluationVersionID("evaluation-version-" + string(projectID)),
 		Evaluation:             evaluation,
 		ProjectVersion:         projectVersion,
 		EvaluatedAt:            policyTestTime(),
@@ -217,6 +220,7 @@ func testEvaluation(t *testing.T, confidenceBasisPoints int, evidenceAsOf time.T
 		Axes:                   axes,
 		Confidence:             confidence,
 		Derivation:             domain.EvaluationDerivationAuthored,
+		EvidenceIDs:            evidenceIDs,
 		SemanticVersion:        domain.EvaluationSemanticVersionV1,
 		FormulaSemanticVersion: domain.BaseScoreFormulaSemanticVersionV1,
 		AcceptedBy:             actor,
@@ -226,6 +230,10 @@ func testEvaluation(t *testing.T, confidenceBasisPoints int, evidenceAsOf time.T
 		t.Fatalf("NewEvaluationVersion() error = %v", err)
 	}
 	return version
+}
+
+func testEvaluation(t *testing.T, confidenceBasisPoints int, evidenceAsOf time.Time, evidenceIDs ...domain.EvidenceReferenceID) domain.EvaluationVersion {
+	return testEvaluationForProject(t, domain.ProjectID("project-1"), confidenceBasisPoints, evidenceAsOf, evidenceIDs...)
 }
 
 func request(t *testing.T, policySet domain.PolicySetVersion, instanceID domain.PolicyInstanceID, subject domain.PolicySubject) Request {
@@ -240,6 +248,17 @@ func request(t *testing.T, policySet domain.PolicySetVersion, instanceID domain.
 			Subject: subject,
 		},
 	}
+}
+
+func referenceValue(t *testing.T, decision domain.PolicyDecision, kind domain.PolicyInputKind) string {
+	t.Helper()
+	for _, reference := range decision.InputReferences() {
+		if reference.Kind() == kind {
+			return reference.Value()
+		}
+	}
+	t.Fatalf("decision has no input reference for %q", kind)
+	return ""
 }
 
 func TestValidateForActivationAcceptsCompleteBaseline(t *testing.T) {
@@ -312,6 +331,9 @@ func TestLifecycleEvaluator(t *testing.T) {
 			if got := decision.Result(); got != tc.want {
 				t.Fatalf("Result() = %q, want %q", got, tc.want)
 			}
+			if got := referenceValue(t, decision, domain.PolicyInputLifecycleState); got != string(tc.state) {
+				t.Fatalf("lifecycle input reference = %q, want %q", got, tc.state)
+			}
 		})
 	}
 
@@ -345,7 +367,7 @@ func TestRequiredEvaluationEvaluator(t *testing.T) {
 		t.Fatalf("missing evaluation inputs = %#v", got)
 	}
 
-	evaluation := testEvaluation(t, 7000, policyTestTime())
+	evaluation := testEvaluation(t, 7000, policyTestTime(), domain.EvidenceReferenceID("evidence-1"))
 	req.Context.Evaluation = &evaluation
 	decision, err = Evaluate(req)
 	if err != nil {
@@ -354,31 +376,40 @@ func TestRequiredEvaluationEvaluator(t *testing.T) {
 	if got := decision.Result(); got != domain.PolicyDecisionAllow {
 		t.Fatalf("present evaluation Result() = %q, want %q", got, domain.PolicyDecisionAllow)
 	}
+	if got, want := referenceValue(t, decision, domain.PolicyInputAcceptedEvaluation), string(evaluation.ID()); got != want {
+		t.Fatalf("evaluation input reference = %q, want %q", got, want)
+	}
+	if got := decision.EvidenceIDs(); len(got) != 1 || got[0] != domain.EvidenceReferenceID("evidence-1") {
+		t.Fatalf("decision evidence = %#v, want inherited evaluation evidence", got)
+	}
 }
 
 func TestCapacityEvaluator(t *testing.T) {
 	set := baselinePolicySet(t)
 	req := request(t, set, domain.PolicyInstanceID("capacity-now-default"), placementSubject(t, domain.PlacementNow))
-	count := 2
+	count := 3
 	req.Context.SelectedCount = &count
 	decision, err := Evaluate(req)
 	if err != nil {
-		t.Fatalf("Evaluate(capacity available) error = %v", err)
+		t.Fatalf("Evaluate(capacity satisfied) error = %v", err)
 	}
 	if got := decision.Result(); got != domain.PolicyDecisionAllow {
-		t.Fatalf("capacity available Result() = %q, want %q", got, domain.PolicyDecisionAllow)
+		t.Fatalf("capacity satisfied Result() = %q, want %q", got, domain.PolicyDecisionAllow)
+	}
+	if got := referenceValue(t, decision, domain.PolicyInputSelectedCount); got != "3" {
+		t.Fatalf("selected-count input reference = %q, want 3", got)
 	}
 	if len(decision.Effects()) != 1 {
 		t.Fatalf("capacity effects = %d, want 1", len(decision.Effects()))
 	}
 
-	count = 3
+	count = 4
 	decision, err = Evaluate(req)
 	if err != nil {
-		t.Fatalf("Evaluate(capacity exhausted) error = %v", err)
+		t.Fatalf("Evaluate(capacity exceeded) error = %v", err)
 	}
 	if got := decision.Result(); got != domain.PolicyDecisionDeny {
-		t.Fatalf("capacity exhausted Result() = %q, want %q", got, domain.PolicyDecisionDeny)
+		t.Fatalf("capacity exceeded Result() = %q, want %q", got, domain.PolicyDecisionDeny)
 	}
 
 	other := request(t, set, domain.PolicyInstanceID("capacity-now-default"), placementSubject(t, domain.PlacementNext))
@@ -404,6 +435,9 @@ func TestConfidenceEvaluatorRequiresReviewForWeakEvidence(t *testing.T) {
 	if got := decision.Result(); got != domain.PolicyDecisionRequireReview {
 		t.Fatalf("weak confidence Result() = %q, want %q", got, domain.PolicyDecisionRequireReview)
 	}
+	if got, want := referenceValue(t, decision, domain.PolicyInputAcceptedEvaluation), string(weak.ID()); got != want {
+		t.Fatalf("confidence evaluation input reference = %q, want %q", got, want)
+	}
 
 	req.Context.Evaluation = nil
 	decision, err = Evaluate(req)
@@ -428,6 +462,12 @@ func TestFreshnessEvaluatorRequiresReviewForStaleEvidence(t *testing.T) {
 	if got := decision.Result(); got != domain.PolicyDecisionRequireReview {
 		t.Fatalf("stale Result() = %q, want %q", got, domain.PolicyDecisionRequireReview)
 	}
+	if got, want := referenceValue(t, decision, domain.PolicyInputAcceptedEvaluation), string(stale.ID()); got != want {
+		t.Fatalf("freshness evaluation input reference = %q, want %q", got, want)
+	}
+	if got, want := referenceValue(t, decision, domain.PolicyInputAsOfTime), policyTestTime().UTC().Format(time.RFC3339Nano); got != want {
+		t.Fatalf("freshness as-of input reference = %q, want %q", got, want)
+	}
 
 	req.Context.AsOf = time.Time{}
 	decision, err = Evaluate(req)
@@ -439,6 +479,39 @@ func TestFreshnessEvaluatorRequiresReviewForStaleEvidence(t *testing.T) {
 	}
 	if got := decision.MissingInputs(); len(got) != 1 || got[0] != domain.PolicyInputAsOfTime {
 		t.Fatalf("missing freshness inputs = %#v", got)
+	}
+}
+
+func TestEvaluateRejectsEvaluationForDifferentProject(t *testing.T) {
+	set := baselinePolicySet(t)
+	evaluation := testEvaluationForProject(t, domain.ProjectID("project-2"), 7000, policyTestTime())
+	req := request(t, set, domain.PolicyInstanceID("evaluation-required-default"), projectSubject(t))
+	req.Context.Evaluation = &evaluation
+
+	_, err := Evaluate(req)
+	var failure *EvaluationFailure
+	if !errors.As(err, &failure) {
+		t.Fatalf("Evaluate() error = %T %v, want EvaluationFailure", err, err)
+	}
+	if got, want := failure.Code, "evaluation_subject_mismatch"; got != want {
+		t.Fatalf("failure code = %q, want %q", got, want)
+	}
+}
+
+func TestEvaluateRejectsEvaluationAcceptedAfterDecisionTime(t *testing.T) {
+	set := baselinePolicySet(t)
+	evaluation := testEvaluation(t, 7000, policyTestTime())
+	req := request(t, set, domain.PolicyInstanceID("evaluation-required-default"), projectSubject(t))
+	req.CreatedAt = policyTestTime().Add(-time.Second)
+	req.Context.Evaluation = &evaluation
+
+	_, err := Evaluate(req)
+	var failure *EvaluationFailure
+	if !errors.As(err, &failure) {
+		t.Fatalf("Evaluate() error = %T %v, want EvaluationFailure", err, err)
+	}
+	if got, want := failure.Code, "evaluation_not_yet_accepted"; got != want {
+		t.Fatalf("failure code = %q, want %q", got, want)
 	}
 }
 
