@@ -17,21 +17,25 @@ A `kill` placement is a recommendation to stop investing. It is not an automatic
 
 ## Public repository role
 
-This repository is the public home for reusable Calathea semantics and implementation.
+This repository is the canonical public home for reusable Calathea semantics and implementation.
 
-Calathea is migrating from the private `hackelia-micrantha/calathea` repository into a clean public-core/private-composition split. The executable deterministic Go core is being promoted here under the coordinated migration tracked by #2 and private `calathea#48`. A source path becomes canonical here only when its private duplicate is removed or replaced as part of that migration slice.
+Calathea uses a public-core/private-composition split:
 
-See [the repository boundary](docs/architecture/repository-boundary.md) for ownership rules and [ADR 0001](docs/adr/0001_public_go_process_boundary.md) for the Go/process boundary.
+- **`calathea-community`** owns reusable product contracts, deterministic implementation, public tooling, and supported integration boundaries;
+- **`calathea`** retains private portfolio data/configuration, dogfood operations, and intentionally private extensions.
+
+See [the repository boundary](docs/architecture/repository-boundary.md) for ownership rules and [ADR 0005](docs/adr/0005_public_go_process_boundary.md) for the Go/process boundary.
 
 ### Public core
 
-`calathea-community` owns or is intended to own:
+`calathea-community` owns:
 
 - deterministic domain and orientation logic;
 - generic application services and application-owned ports;
-- the `calathea` CLI and reusable local persistence implementation;
+- the `calathea` CLI and reusable local persistence implementation as it is added;
 - schemas, migrations, fixtures, golden tests, and conformance tests;
-- reusable PRD/use cases, RFCs, ADRs, and architecture contracts;
+- the public [PRD](docs/product/prd.md), [use cases](docs/product/use-cases.md), and [MVP roadmap](docs/product/mvp-roadmap.md);
+- [RFCs](docs/rfcs/README.md), [ADRs](docs/adr/README.md), and architecture contracts;
 - public contracts for optional integrations such as Invokrum;
 - generic examples, documentation, CI, and development tooling.
 
@@ -48,7 +52,7 @@ The private `calathea` repository retains:
 
 Credentials and secret values belong in neither repository.
 
-## Go boundary
+## Go and process boundary
 
 The public module is:
 
@@ -59,6 +63,8 @@ github.com/hackelia-micrantha/calathea-community
 The executable remains named `calathea`.
 
 The Go implementation stays under `internal/`; those package paths are not a supported external library API. For v0, cross-repository composition uses the executable plus explicitly versioned file/schema/CLI contracts. A future exported Go facade requires a concrete in-process consumer and a separate compatibility decision.
+
+The supported process surface and its current stable anchors are defined in the [CLI and process compatibility contract](docs/architecture/cli-process-contract.md). Automation must not treat human-readable CLI prose or internal Go identifiers as machine contracts.
 
 ## Product boundary
 
@@ -94,7 +100,7 @@ flowchart TB
     Private[calathea\nprivate composition + data] --> Public[calathea-community\npublic reusable core]
     Public --> Domain[Domain + orientation engine]
     Public --> CLI[CLI + application ports]
-    Public --> Contracts[Public contracts + RFCs]
+    Public --> Contracts[PRD + RFCs + ADRs]
     Private --> PrivateData[Portfolio/evidence/config]
     Private --> PrivateExt[Private experiments/extensions]
 ```
@@ -111,15 +117,14 @@ mise run check
 
 It verifies formatting, runs `go vet` and `go test ./...`, and builds the `calathea` executable. The core has no third-party Go module dependencies at this stage.
 
-## Current migration status
+## Current status
 
 - repository ownership and MPL-2.0 licensing are established;
-- the Go module, CLI/application boundary, deterministic domain foundation, tests, and synthetic golden fixtures are staged in the public-core extraction;
-- the process boundary deliberately avoids exporting a broad Go library API;
-- reusable PRD/RFC/ADR/architecture migration remains tracked by #3;
-- CLI/process compatibility hardening is tracked by #5;
-- public-safety review of promoted source/fixtures is tracked by #6;
-- the private companion cleanup is tracked by `calathea#48`.
+- the executable deterministic Go foundation is canonical here after public PR #7 and the coordinated private cleanup;
+- reusable product/RFC/ADR/architecture contracts are canonical here after public PR #8 and the coordinated private cleanup;
+- the public process boundary deliberately avoids exporting a broad Go library API;
+- the CLI/process compatibility contract defines the current supported automation boundary;
+- private portfolio and dogfood data remain outside this repository.
 
 ## Security and privacy
 
