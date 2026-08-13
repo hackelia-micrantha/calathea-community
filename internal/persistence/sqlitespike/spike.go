@@ -304,14 +304,18 @@ func (s *Store) Apply(ctx context.Context, request WriteRequest) (WriteResult, e
 }
 
 func validateWriteRequest(request WriteRequest) error {
-	for name, value := range map[string]string{
-		"operation id": request.OperationID,
-		"entity id":    request.EntityID,
-		"record id":    request.RecordID,
-		"payload":      request.Payload,
-	} {
-		if strings.TrimSpace(value) == "" {
-			return fmt.Errorf("%s must not be empty", name)
+	fields := []struct {
+		name  string
+		value string
+	}{
+		{name: "operation id", value: request.OperationID},
+		{name: "entity id", value: request.EntityID},
+		{name: "record id", value: request.RecordID},
+		{name: "payload", value: request.Payload},
+	}
+	for _, field := range fields {
+		if strings.TrimSpace(field.value) == "" {
+			return fmt.Errorf("%s must not be empty", field.name)
 		}
 	}
 	if request.ExpectedRevision < 0 || request.NewRevision <= 0 {
