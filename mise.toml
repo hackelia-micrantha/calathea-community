@@ -79,6 +79,9 @@ mise run build
 description = "Validate the CGO-free SQLite persistence hypothesis"
 run = '''
 set -eu
+go mod tidy
+git diff --exit-code -- go.mod go.sum
+go mod verify
 CGO_ENABLED=0 go test -count=1 -timeout=2m ./internal/persistence/sqlitespike
 CGO_ENABLED=0 go build ./internal/persistence/sqlitespike
 '''
