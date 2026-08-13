@@ -52,7 +52,7 @@ The private `calathea` repository retains:
 
 Credentials and secret values belong in neither repository.
 
-## Go boundary
+## Go and process boundary
 
 The public module is:
 
@@ -63,6 +63,8 @@ github.com/hackelia-micrantha/calathea-community
 The executable remains named `calathea`.
 
 The Go implementation stays under `internal/`; those package paths are not a supported external library API. For v0, cross-repository composition uses the executable plus explicitly versioned file/schema/CLI contracts. A future exported Go facade requires a concrete in-process consumer and a separate compatibility decision.
+
+The supported process surface and its current stable anchors are defined in the [CLI and process compatibility contract](docs/architecture/cli-process-contract.md). Automation must not treat human-readable CLI prose or internal Go identifiers as machine contracts.
 
 ## Product boundary
 
@@ -119,9 +121,9 @@ It verifies formatting, runs `go vet` and `go test ./...`, and builds the `calat
 
 - repository ownership and MPL-2.0 licensing are established;
 - the executable deterministic Go foundation is canonical here after public PR #7 and the coordinated private cleanup;
+- reusable product/RFC/ADR/architecture contracts are canonical here after public PR #8 and the coordinated private cleanup;
 - the public process boundary deliberately avoids exporting a broad Go library API;
-- reusable product/RFC/ADR/architecture contracts are being made canonical here under #3;
-- CLI/process compatibility hardening remains tracked by #5;
+- the CLI/process compatibility contract defines the current supported automation boundary;
 - private portfolio and dogfood data remain outside this repository.
 
 ## Security and privacy
