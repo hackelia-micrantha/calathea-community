@@ -33,7 +33,7 @@ jobs:
       - name: Static analysis
         run: mise run static
 
-      - name: Unit tests, race detector, and coverage
+      - name: Unit tests and coverage
         run: mise run test-unit
 
       - name: Integration tests
