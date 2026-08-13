@@ -10,12 +10,12 @@ const PolicyEvaluatorSemanticVersionV1 = "1"
 type PolicyEvaluatorType string
 
 const (
-	PolicyEvaluatorCapacityLimit       PolicyEvaluatorType = "capacity_limit"
-	PolicyEvaluatorRequiredEvaluation  PolicyEvaluatorType = "required_evaluation"
+	PolicyEvaluatorCapacityLimit        PolicyEvaluatorType = "capacity_limit"
+	PolicyEvaluatorRequiredEvaluation   PolicyEvaluatorType = "required_evaluation"
 	PolicyEvaluatorLifecycleEligibility PolicyEvaluatorType = "lifecycle_eligibility"
-	PolicyEvaluatorConfidenceGate      PolicyEvaluatorType = "confidence_gate"
-	PolicyEvaluatorFreshnessRule       PolicyEvaluatorType = "freshness_rule"
-	PolicyEvaluatorScoreMultiplier     PolicyEvaluatorType = "score_multiplier"
+	PolicyEvaluatorConfidenceGate       PolicyEvaluatorType = "confidence_gate"
+	PolicyEvaluatorFreshnessRule        PolicyEvaluatorType = "freshness_rule"
+	PolicyEvaluatorScoreMultiplier      PolicyEvaluatorType = "score_multiplier"
 )
 
 func (t PolicyEvaluatorType) Valid() bool {
@@ -50,12 +50,12 @@ func (c PolicyEffectClass) Valid() bool {
 type PolicyPhase string
 
 const (
-	PolicyPhaseCandidateEligibility    PolicyPhase = "candidate_eligibility"
-	PolicyPhaseCandidateAdjustment     PolicyPhase = "candidate_adjustment"
-	PolicyPhaseSetConstraints          PolicyPhase = "set_constraints"
-	PolicyPhaseResultValidation        PolicyPhase = "result_validation"
-	PolicyPhaseDispositionValidation   PolicyPhase = "disposition_validation"
-	PolicyPhaseReviewDiagnostics       PolicyPhase = "review_diagnostics"
+	PolicyPhaseCandidateEligibility  PolicyPhase = "candidate_eligibility"
+	PolicyPhaseCandidateAdjustment   PolicyPhase = "candidate_adjustment"
+	PolicyPhaseSetConstraints        PolicyPhase = "set_constraints"
+	PolicyPhaseResultValidation      PolicyPhase = "result_validation"
+	PolicyPhaseDispositionValidation PolicyPhase = "disposition_validation"
+	PolicyPhaseReviewDiagnostics     PolicyPhase = "review_diagnostics"
 )
 
 func (p PolicyPhase) Valid() bool {
@@ -111,9 +111,9 @@ func (b PolicyMissingInputBehavior) Valid() bool {
 type PolicyExceptionability string
 
 const (
-	PolicyNotExceptionable              PolicyExceptionability = "not_exceptionable"
-	PolicyExceptionableWithReview       PolicyExceptionability = "exceptionable_with_review"
-	PolicyExceptionableWithConstraints  PolicyExceptionability = "exceptionable_with_constraints"
+	PolicyNotExceptionable             PolicyExceptionability = "not_exceptionable"
+	PolicyExceptionableWithReview      PolicyExceptionability = "exceptionable_with_review"
+	PolicyExceptionableWithConstraints PolicyExceptionability = "exceptionable_with_constraints"
 )
 
 func (e PolicyExceptionability) Valid() bool {
@@ -151,6 +151,9 @@ func NewCapacityLimitPolicyEffect(placement Placement, maximum int) (PolicyEffec
 	if maximum < 0 {
 		return PolicyEffect{}, fmt.Errorf("capacity maximum must not be negative")
 	}
+	if uint64(maximum) > uint64(^uint32(0)) {
+		return PolicyEffect{}, fmt.Errorf("capacity maximum %d exceeds supported uint32 range", maximum)
+	}
 	return PolicyEffect{kind: PolicyEffectCapacityLimit, placement: placement, maximum: uint32(maximum)}, nil
 }
 
@@ -171,12 +174,12 @@ func NewDiagnosticPolicyEffect(code, value string) (PolicyEffect, error) {
 	return PolicyEffect{kind: PolicyEffectDiagnosticAnnotation, code: code, value: value}, nil
 }
 
-func (e PolicyEffect) Kind() PolicyEffectKind       { return e.kind }
-func (e PolicyEffect) Placement() Placement         { return e.placement }
-func (e PolicyEffect) Maximum() uint32              { return e.maximum }
-func (e PolicyEffect) MultiplierBasisPoints() uint32 { return e.multiplierBasisPoints }
-func (e PolicyEffect) Code() string                 { return e.code }
-func (e PolicyEffect) Value() string                { return e.value }
+func (e PolicyEffect) Kind() PolicyEffectKind          { return e.kind }
+func (e PolicyEffect) Placement() Placement            { return e.placement }
+func (e PolicyEffect) Maximum() uint32                 { return e.maximum }
+func (e PolicyEffect) MultiplierBasisPoints() uint32   { return e.multiplierBasisPoints }
+func (e PolicyEffect) Code() string                    { return e.code }
+func (e PolicyEffect) Value() string                   { return e.value }
 
 type CapacityLimitParameters struct {
 	placement Placement
@@ -344,17 +347,17 @@ func NewScoreMultiplierPolicyInstance(id PolicyInstanceID, policyID PolicyID, pa
 	return newPolicyInstance(id, policyID, PolicyEvaluatorScoreMultiplier, PolicyEffectSoft, PolicyPhaseCandidateAdjustment, priority, PolicyMissingFailOperation, PolicyNotExceptionable, true, rationale, policyParameters{multiplier: &parameters})
 }
 
-func (p PolicyInstance) ID() PolicyInstanceID                         { return p.id }
-func (p PolicyInstance) PolicyID() PolicyID                           { return p.policyID }
-func (p PolicyInstance) EvaluatorType() PolicyEvaluatorType           { return p.evaluatorType }
-func (p PolicyInstance) EvaluatorVersion() string                     { return p.evaluatorVersion }
-func (p PolicyInstance) EffectClass() PolicyEffectClass               { return p.effectClass }
-func (p PolicyInstance) Phase() PolicyPhase                           { return p.phase }
-func (p PolicyInstance) Priority() int                                { return p.priority }
-func (p PolicyInstance) MissingInputBehavior() PolicyMissingInputBehavior { return p.missingInputBehavior }
-func (p PolicyInstance) Exceptionability() PolicyExceptionability     { return p.exceptionability }
-func (p PolicyInstance) Enabled() bool                                { return p.enabled }
-func (p PolicyInstance) Rationale() string                            { return p.rationale }
+func (p PolicyInstance) ID() PolicyInstanceID                               { return p.id }
+func (p PolicyInstance) PolicyID() PolicyID                                 { return p.policyID }
+func (p PolicyInstance) EvaluatorType() PolicyEvaluatorType                 { return p.evaluatorType }
+func (p PolicyInstance) EvaluatorVersion() string                           { return p.evaluatorVersion }
+func (p PolicyInstance) EffectClass() PolicyEffectClass                     { return p.effectClass }
+func (p PolicyInstance) Phase() PolicyPhase                                 { return p.phase }
+func (p PolicyInstance) Priority() int                                      { return p.priority }
+func (p PolicyInstance) MissingInputBehavior() PolicyMissingInputBehavior   { return p.missingInputBehavior }
+func (p PolicyInstance) Exceptionability() PolicyExceptionability           { return p.exceptionability }
+func (p PolicyInstance) Enabled() bool                                      { return p.enabled }
+func (p PolicyInstance) Rationale() string                                  { return p.rationale }
 
 func (p PolicyInstance) CapacityLimitParameters() (CapacityLimitParameters, bool) {
 	if p.parameters.capacity == nil {
@@ -362,24 +365,28 @@ func (p PolicyInstance) CapacityLimitParameters() (CapacityLimitParameters, bool
 	}
 	return *p.parameters.capacity, true
 }
+
 func (p PolicyInstance) LifecycleEligibilityParameters() (LifecycleEligibilityParameters, bool) {
 	if p.parameters.lifecycle == nil {
 		return LifecycleEligibilityParameters{}, false
 	}
 	return *p.parameters.lifecycle, true
 }
+
 func (p PolicyInstance) ConfidenceGateParameters() (ConfidenceGateParameters, bool) {
 	if p.parameters.confidence == nil {
 		return ConfidenceGateParameters{}, false
 	}
 	return *p.parameters.confidence, true
 }
+
 func (p PolicyInstance) FreshnessRuleParameters() (FreshnessRuleParameters, bool) {
 	if p.parameters.freshness == nil {
 		return FreshnessRuleParameters{}, false
 	}
 	return *p.parameters.freshness, true
 }
+
 func (p PolicyInstance) ScoreMultiplierParameters() (ScoreMultiplierParameters, bool) {
 	if p.parameters.multiplier == nil {
 		return ScoreMultiplierParameters{}, false
@@ -458,10 +465,18 @@ func NewPolicyException(input PolicyExceptionInput) (PolicyException, error) {
 	if err := requireText("policy exception rationale", input.Rationale); err != nil {
 		return PolicyException{}, err
 	}
+	if len(input.EvidenceIDs) == 0 {
+		return PolicyException{}, fmt.Errorf("policy exception requires supporting evidence/provenance")
+	}
+	seenEvidence := make(map[EvidenceReferenceID]struct{}, len(input.EvidenceIDs))
 	for _, evidenceID := range input.EvidenceIDs {
 		if err := requireIdentifier("policy exception evidence reference id", string(evidenceID)); err != nil {
 			return PolicyException{}, err
 		}
+		if _, exists := seenEvidence[evidenceID]; exists {
+			return PolicyException{}, fmt.Errorf("policy exception evidence reference id %q is duplicated", evidenceID)
+		}
+		seenEvidence[evidenceID] = struct{}{}
 	}
 	if input.CreatedAt.IsZero() || input.EffectiveAt.IsZero() || input.ExpiresAt.IsZero() {
 		return PolicyException{}, fmt.Errorf("policy exception times must not be zero")
@@ -484,22 +499,22 @@ func NewPolicyException(input PolicyExceptionInput) (PolicyException, error) {
 		}
 	}
 	return PolicyException{
-		id:                  input.ID,
-		policySetVersionID:  input.PolicySetVersionID,
-		policyID:            input.PolicyID,
-		policyInstanceID:    input.PolicyInstanceID,
-		evaluatorVersion:    input.EvaluatorVersion,
-		projectID:           input.ProjectID,
-		phase:               input.Phase,
-		permittedDeviation:  input.PermittedDeviation,
-		actor:               input.Actor,
-		rationale:           input.Rationale,
-		evidenceIDs:         cloneEvidenceIDs(input.EvidenceIDs),
-		createdAt:           input.CreatedAt,
-		effectiveAt:         input.EffectiveAt,
-		expiresAt:           input.ExpiresAt,
-		maximumUses:         input.MaximumUses,
-		supersedes:          clonePolicyExceptionID(input.Supersedes),
+		id:                 input.ID,
+		policySetVersionID: input.PolicySetVersionID,
+		policyID:           input.PolicyID,
+		policyInstanceID:   input.PolicyInstanceID,
+		evaluatorVersion:   input.EvaluatorVersion,
+		projectID:          input.ProjectID,
+		phase:              input.Phase,
+		permittedDeviation: input.PermittedDeviation,
+		actor:              input.Actor,
+		rationale:          input.Rationale,
+		evidenceIDs:        cloneEvidenceIDs(input.EvidenceIDs),
+		createdAt:          input.CreatedAt,
+		effectiveAt:        input.EffectiveAt,
+		expiresAt:          input.ExpiresAt,
+		maximumUses:        input.MaximumUses,
+		supersedes:         clonePolicyExceptionID(input.Supersedes),
 	}, nil
 }
 
@@ -593,12 +608,12 @@ func NewPolicyExceptionApplication(id PolicyExceptionApplicationID, exception Po
 	return PolicyExceptionApplication{id: id, exceptionID: exception.ID(), projectID: projectID, operationID: operationID, policyDecisionID: policyDecisionID, appliedAt: appliedAt}, nil
 }
 
-func (a PolicyExceptionApplication) ID() PolicyExceptionApplicationID { return a.id }
-func (a PolicyExceptionApplication) ExceptionID() PolicyExceptionID   { return a.exceptionID }
-func (a PolicyExceptionApplication) ProjectID() ProjectID             { return a.projectID }
-func (a PolicyExceptionApplication) OperationID() OperationID         { return a.operationID }
-func (a PolicyExceptionApplication) PolicyDecisionID() PolicyDecisionID { return a.policyDecisionID }
-func (a PolicyExceptionApplication) AppliedAt() time.Time             { return a.appliedAt }
+func (a PolicyExceptionApplication) ID() PolicyExceptionApplicationID             { return a.id }
+func (a PolicyExceptionApplication) ExceptionID() PolicyExceptionID               { return a.exceptionID }
+func (a PolicyExceptionApplication) ProjectID() ProjectID                         { return a.projectID }
+func (a PolicyExceptionApplication) OperationID() OperationID                     { return a.operationID }
+func (a PolicyExceptionApplication) PolicyDecisionID() PolicyDecisionID           { return a.policyDecisionID }
+func (a PolicyExceptionApplication) AppliedAt() time.Time                         { return a.appliedAt }
 
 func clonePolicyExceptionID(value *PolicyExceptionID) *PolicyExceptionID {
 	if value == nil {
