@@ -16,7 +16,7 @@ concurrency:
 jobs:
   quality:
     runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,5 +27,25 @@ jobs:
       - name: Install pinned toolchain
         run: mise install
 
-      - name: Run quality gate
-        run: mise run check
+      - name: Verify formatting
+        run: mise run format-check
+
+      - name: Static analysis
+        run: mise run static
+
+      - name: Unit tests and coverage
+        run: mise run test-unit
+
+      - name: End-to-end CLI tests
+        run: mise run test-e2e
+
+      - name: Fuzz domain invariants
+        env:
+          FUZZ_TIME: 20s
+        run: mise run fuzz
+
+      - name: Vulnerability analysis
+        run: mise run vuln
+
+      - name: Build CLI
+        run: mise run build
