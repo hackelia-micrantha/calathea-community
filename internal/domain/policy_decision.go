@@ -30,9 +30,8 @@ func (r PolicyDecisionResult) Valid() bool {
 
 // PolicyDecision is the immutable deterministic result of applying one policy
 // instance to one project in one operation. It captures evaluator identity,
-// effect class/phase, typed effects, missing-input behavior, and exact evidence
-// references so orientation/replay can explain policy without re-running mutable
-// configuration.
+// effect class/phase, typed effects, exact deterministic inputs, missing-input
+// behavior, and evidence references so replay does not depend on ambient state.
 type PolicyDecision struct {
 	id                   PolicyDecisionID
 	policySetVersionID   PolicySetVersionID
@@ -47,6 +46,7 @@ type PolicyDecision struct {
 	phase                PolicyPhase
 	effects              []PolicyEffect
 	reasonCode           string
+	inputReferences      []string
 	evidenceIDs          []EvidenceReferenceID
 	missingInputs        []string
 	missingInputBehavior PolicyMissingInputBehavior
@@ -69,6 +69,7 @@ type PolicyDecisionInput struct {
 	Phase                PolicyPhase
 	Effects              []PolicyEffect
 	ReasonCode           string
+	InputReferences      []string
 	EvidenceIDs          []EvidenceReferenceID
 	MissingInputs        []string
 	MissingInputBehavior PolicyMissingInputBehavior
@@ -122,6 +123,11 @@ func NewPolicyDecision(input PolicyDecisionInput) (PolicyDecision, error) {
 	}
 	if input.CreatedAt.IsZero() {
 		return PolicyDecision{}, errZeroTime("policy decision time")
+	}
+	for _, reference := range input.InputReferences {
+		if err := requireText("policy decision input reference", reference); err != nil {
+			return PolicyDecision{}, err
+		}
 	}
 	for _, evidenceID := range input.EvidenceIDs {
 		if err := requireIdentifier("policy decision evidence reference id", string(evidenceID)); err != nil {
@@ -177,6 +183,7 @@ func NewPolicyDecision(input PolicyDecisionInput) (PolicyDecision, error) {
 		phase:                input.Phase,
 		effects:              clonePolicyEffects(input.Effects),
 		reasonCode:           input.ReasonCode,
+		inputReferences:      cloneStrings(input.InputReferences),
 		evidenceIDs:          cloneEvidenceIDs(input.EvidenceIDs),
 		missingInputs:        cloneStrings(input.MissingInputs),
 		missingInputBehavior: input.MissingInputBehavior,
@@ -199,6 +206,7 @@ func (d PolicyDecision) EffectClass() PolicyEffectClass         { return d.effec
 func (d PolicyDecision) Phase() PolicyPhase                     { return d.phase }
 func (d PolicyDecision) Effects() []PolicyEffect                { return clonePolicyEffects(d.effects) }
 func (d PolicyDecision) ReasonCode() string                     { return d.reasonCode }
+func (d PolicyDecision) InputReferences() []string              { return cloneStrings(d.inputReferences) }
 func (d PolicyDecision) EvidenceIDs() []EvidenceReferenceID     { return cloneEvidenceIDs(d.evidenceIDs) }
 func (d PolicyDecision) MissingInputs() []string                { return cloneStrings(d.missingInputs) }
 func (d PolicyDecision) MissingInputBehavior() PolicyMissingInputBehavior { return d.missingInputBehavior }
