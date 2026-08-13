@@ -75,11 +75,20 @@ mise run test
 mise run build
 '''
 
+[tasks.sqlite-spike]
+description = "Validate the CGO-free SQLite persistence hypothesis"
+run = '''
+set -eu
+CGO_ENABLED=0 go test -count=1 -timeout=2m ./internal/persistence/sqlitespike
+CGO_ENABLED=0 go build ./internal/persistence/sqlitespike
+'''
+
 [tasks.ci]
 description = "Run all CI quality, security, and fuzz gates"
 run = '''
 set -eu
 mise run check
+mise run sqlite-spike
 mise run vuln
 mise run fuzz
 '''
