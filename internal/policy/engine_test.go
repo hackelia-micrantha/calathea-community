@@ -11,6 +11,8 @@ func policyTestTime() time.Time {
 	return time.Date(2026, time.August, 12, 12, 0, 0, 0, time.UTC)
 }
 
+func intPointer(value int) *int { return &value }
+
 func mustPolicySet(t *testing.T) domain.PolicySet {
 	t.Helper()
 	set, err := domain.NewPolicySet("policy-set")
@@ -26,7 +28,7 @@ func mustBaselinePolicySet(t *testing.T) domain.PolicySetVersion {
 		ID:                  "policy-set-v1",
 		PolicySet:           mustPolicySet(t),
 		CreatedAt:           policyTestTime(),
-		MaxNext:             10,
+		MaxNext:             intPointer(10),
 		MinimumConfidence:   domain.ConfidenceVisibleUncertainty,
 		FreshnessMaximumAge: 30 * 24 * time.Hour,
 	})
@@ -129,6 +131,29 @@ func TestBaselinePolicySetHasRequiredDeterministicPolicies(t *testing.T) {
 	if nowMaximum != 3 || nextMaximum != 10 {
 		t.Fatalf("capacity defaults = now:%d next:%d, want now:3 next:10", nowMaximum, nextMaximum)
 	}
+}
+
+func TestBaselinePolicySetPreservesExplicitZeroNextCapacity(t *testing.T) {
+	version, err := NewBaselinePolicySetVersion(BaselinePolicySetConfig{
+		ID:                  "policy-set-zero-next",
+		PolicySet:           mustPolicySet(t),
+		CreatedAt:           policyTestTime(),
+		MaxNext:             intPointer(0),
+		FreshnessMaximumAge: 30 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("NewBaselinePolicySetVersion() error = %v", err)
+	}
+	for _, instance := range version.Instances() {
+		parameters, ok := instance.CapacityLimitParameters()
+		if ok && parameters.Placement() == domain.PlacementNext {
+			if parameters.Maximum() != 0 {
+				t.Fatalf("next capacity = %d, want explicit zero", parameters.Maximum())
+			}
+			return
+		}
+	}
+	t.Fatal("next capacity policy not found")
 }
 
 func TestProjectEvaluationIsDeterministicAndExplainable(t *testing.T) {
@@ -254,7 +279,7 @@ func TestCapacityPoliciesEnforceNowAndNextBounds(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := engine.EvaluateCapacity(version, CapacityContext{
-				OperationID:   "op-capacity-" + domain.OperationID(tc.name),
+				OperationID:   domain.OperationID("op-capacity-" + tc.name),
 				ProjectID:     "project-1",
 				Placement:     tc.placement,
 				SelectedCount: tc.selectedCount,
