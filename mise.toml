@@ -44,23 +44,23 @@ description = "Run unit tests with coverage"
 run = '''
 set -eu
 coverage="${TMPDIR:-/tmp}/calathea-unit.coverage"
-go test -count=1 -shuffle=on -coverprofile="$coverage" ./internal/...
+go test -count=1 -shuffle=on -timeout=2m -coverprofile="$coverage" ./internal/...
 go tool cover -func="$coverage"
 '''
 
 [tasks.test-integration]
 description = "Run application/process-contract integration tests"
-run = "go test -count=1 -tags=integration ./tests/integration/..."
+run = "go test -count=1 -timeout=2m -tags=integration ./tests/integration/..."
 
 [tasks.test-e2e]
 description = "Build and exercise the CLI as an OS process"
-run = "go test -count=1 -tags=e2e ./tests/e2e/..."
+run = "go test -count=1 -timeout=2m -tags=e2e ./tests/e2e/..."
 
 [tasks.fuzz]
 description = "Fuzz domain construction invariants"
 run = '''
 set -eu
-go test ./internal/domain -run='^$' -fuzz=FuzzNewPlacementRecommendation -fuzztime="${FUZZ_TIME:-10s}"
+go test ./internal/domain -run='^$' -fuzz=FuzzNewPlacementRecommendation -fuzztime="${FUZZ_TIME:-10s}" -parallel="${FUZZ_PARALLEL:-2}" -timeout=2m
 '''
 
 [tasks.build]
