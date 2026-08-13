@@ -4,10 +4,12 @@
 
 Accepted repository-ownership rule for the Calathea public/private split.
 
+The executable-core migration is complete. Reusable product and architecture contracts are being promoted under the documentation migration slice.
+
 ## Repositories
 
-- `hackelia-micrantha/calathea-community` is the public repository.
-- `hackelia-micrantha/calathea` is the private repository.
+- `hackelia-micrantha/calathea-community` is the public reusable core.
+- `hackelia-micrantha/calathea` is the private composition and dogfood repository.
 
 The split is an ownership boundary, not a periodic mirror.
 
@@ -21,7 +23,7 @@ Reusable Calathea product semantics and implementation that can be developed in 
 - generic application services and application-owned ports;
 - the public CLI and reusable local persistence implementation;
 - public schemas, migrations, fixtures, golden tests, and conformance tests;
-- public PRD/use-case material that defines the reusable product;
+- public PRD/use-case/roadmap material that defines the reusable product;
 - public RFCs and ADRs that define reusable semantics or architecture;
 - public contracts for optional adapters such as Invokrum integration;
 - generic documentation, examples, and development tooling.
@@ -46,56 +48,63 @@ The intended dependency direction is:
 ```text
 calathea (private composition / extensions)
                 |
+                | process / files / versioned contracts
                 v
 calathea-community (public reusable core)
 ```
 
 The public repository must not depend on the private repository for normal build, test, or documented core workflows.
 
-Private code may depend on a released or pinned public-core version. A reusable capability needed by both repositories should normally move down into `calathea-community` rather than being copied upward into the private repository.
+Private composition pins a reviewed public-core revision. A reusable capability needed by both repositories should normally move into `calathea-community` rather than be copied into the private repository.
 
 ## Go module and package boundary
 
-The current private implementation cannot be copied mechanically.
+The public module is:
 
-Today its module path is `github.com/hackelia-micrantha/calathea`, and much of the reusable implementation lives under Go `internal/` packages. A sibling repository cannot import packages beneath `calathea-community/internal/...`, and the public repository cannot retain the private repository's module path as its canonical import identity.
+```text
+github.com/hackelia-micrantha/calathea-community
+```
 
-Before the executable-core migration lands:
+The user-facing binary remains `calathea`.
 
-- select the public module path, expected to be `github.com/hackelia-micrantha/calathea-community` unless a deliberate vanity path is introduced;
-- define the smallest exported library/facade needed by private composition and external consumers;
-- keep implementation details under `internal/` where they do not need cross-repository use;
-- do not expose every current internal package merely to make the split compile;
-- keep the user-facing binary name `calathea` independent of the Go module/repository name;
-- migrate imports and tests deliberately and validate that the private repository can consume only supported public surfaces.
+The reusable Go implementation remains primarily under `internal/`. This is intentional: repository topology did not justify turning the existing implementation tree into a broad external library API.
 
-A subprocess/CLI contract may be appropriate for isolated integrations, but it should not be used solely to avoid defining a coherent public Go API when in-process composition is required.
+For v0, the supported cross-repository surface is:
+
+- the `calathea` executable;
+- explicitly documented CLI behavior and exit semantics;
+- versioned file/schema contracts as they are introduced.
+
+The private repository must not import or vendor `calathea-community/internal/...` packages.
+
+A future exported Go facade requires a concrete in-process consumer and a separate compatibility decision. See [ADR 0005](../adr/0005_public_go_process_boundary.md).
 
 ## Source-of-truth rule
 
 There must be exactly one canonical repository for a maintained path or semantic contract.
 
-During the migration from the existing private-first repository:
+During migration:
 
-1. A path remains private-canonical until its migration slice is complete.
-2. A migration slice copies or reconstructs the public artifact, validates it, and removes the private duplicate or replaces it with a dependency/reference.
-3. Once that slice lands, the public artifact becomes canonical.
-4. Subsequent changes are made in the canonical repository and consumed by the other repository through an explicit dependency, generated artifact, or reference.
+1. A path remains private-canonical until its public replacement is reviewed and validated.
+2. The public artifact is promoted with private-specific data/references removed or generalized.
+3. The corresponding private duplicate is removed or replaced with an explicit public reference/extension.
+4. Only then does the public artifact become canonical.
+5. Subsequent reusable changes are made publicly and consumed privately through the documented boundary.
 
 Do not maintain equivalent source files in both repositories by manual synchronization.
 
 ## Promotion rule
 
-A private capability may be promoted when all of the following hold:
+A private capability or contract may be promoted when all of the following hold:
 
 - it is reusable without private portfolio data;
-- its public API and behavior can be documented independently;
+- its public API/contract and behavior can be documented independently;
 - tests do not require private credentials, infrastructure, or data;
 - sensitive defaults and identifiers can be removed or parameterized;
 - the licensing and dependency chain is compatible with the public repository;
 - security review finds no private operational detail that should remain undisclosed.
 
-Promotion should preserve history where practical, but correctness and a clean ownership boundary take precedence over preserving an awkward repository layout.
+Promotion should preserve accepted semantic history where practical. Correctness and a clean ownership boundary take precedence over preserving private issue-number topology or an awkward repository layout.
 
 ## Private-data boundary
 
@@ -109,32 +118,48 @@ The public core must preserve Calathea's local-first privacy invariants:
 
 These properties are product behavior, not reasons to keep the reusable implementation private.
 
-## Migration sequence
+## Migration status
 
-### Slice 1 — establish the boundary
+### Slice 1 — repository boundary
 
-- update the public repository identity and README;
-- add an explicit public license;
-- document ownership and transition rules;
-- create tracked migration work in both repositories.
+**Complete.**
 
-### Slice 2 — define the public Go surface and move the executable deterministic core
+- public repository identity and MPL-2.0 licensing established;
+- ownership/source-of-truth rules documented;
+- coordinated public/private migration tracking established.
 
-Resolve module/package ownership first, then move the Go module, CLI, reusable domain/orientation implementation, tests, generic application boundary, and CI/tooling needed to build it independently.
+### Slice 2 — executable deterministic core
 
-The slice is complete only when the corresponding private copies are removed or converted into public-core consumption. Code that remains internal implementation detail should stay behind the new public API rather than being exported by default.
+**Complete.**
 
-### Slice 3 — move reusable contracts and documentation
+- public Go module and `calathea` executable established;
+- reusable CLI/application/domain foundation, tests, fixtures, and quality tooling promoted;
+- process/file/schema boundary selected instead of a speculative broad Go API;
+- private duplicate Go implementation removed;
+- private composition pins the reviewed public revision.
 
-Move the reusable PRD/use cases, RFCs, ADRs, architecture contracts, schemas, fixtures, and conformance material. Private-specific annotations should remain private rather than contaminating the public contracts.
+### Slice 3 — reusable contracts and documentation
 
-### Slice 4 — make the private repository thin
+**In progress under public issue #3.**
 
-The private repository should contain only composition, private data/configuration, and genuinely non-public extensions. It should pin the public-core version it consumes and document any temporary exceptions.
+Promotes:
+
+- PRD, use cases, and MVP roadmap;
+- RFC 0000–0008 and RFC governance/template;
+- ADR 0001–0004 accepted history plus ADR 0005 for the public-module/process decision;
+- domain/runtime/system-context and optional Invokrum/structured-invocation architecture contracts.
+
+Private-specific issue topology, data, and annotations are not part of the public contracts.
+
+### Slice 4 — thin private composition
+
+The private repository should retain only composition, private data/configuration, dogfood operations, and genuinely non-public extensions. Reusable docs migrated in Slice 3 are replaced privately by public references or explicit private extensions rather than maintained as copies.
 
 ## CI and release expectations
 
-`calathea-community` should eventually be independently buildable and testable from a clean checkout. Public CI must not rely on private repositories, private runners beyond ordinary execution infrastructure, or private test data.
+`calathea-community` is independently buildable and testable from a clean checkout without access to the private repository or private test data.
+
+Public CI may use ordinary organization execution infrastructure, including self-hosted runners, but its source, dependencies, fixtures, and required secrets must not depend on the private `calathea` repository.
 
 The private repository may run additional integration/dogfood validation against a pinned public-core revision.
 

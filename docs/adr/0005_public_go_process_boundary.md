@@ -1,8 +1,12 @@
-# ADR 0001 — Public Go module and process boundary
+# ADR 0005 — Public Go Module and Process Boundary
 
 ## Status
 
-Accepted for the public-core extraction tracked by #2.
+Accepted for the public-core extraction.
+
+- **Decision date:** 2026-08-12
+- **Governing constraints:** repository boundary, ADR 0001, ADR 0004
+- **Supersedes:** ADR 0004 only with respect to repository/module identity
 
 ## Context
 
@@ -32,7 +36,7 @@ Repository name and binary/product name intentionally differ.
 
 ### Public integration surface
 
-For this extraction, the supported cross-repository integration surface is the `calathea` executable plus explicitly versioned file/schema/CLI contracts as they are introduced.
+The supported cross-repository integration surface is the `calathea` executable plus explicitly versioned file/schema/CLI contracts as they are introduced.
 
 There is **no supported exported Go library API in v0**.
 
@@ -76,11 +80,9 @@ The public repository must build and test without access to the private reposito
 
 ## Provenance and licensing
 
-The initial executable-core files in this extraction were promoted from private `hackelia-micrantha/calathea` at commit `f1b5bdd625c7db890be2d024031d02b675e9b7e4`.
+The initial executable-core files were promoted from private `hackelia-micrantha/calathea` at commit `f1b5bdd625c7db890be2d024031d02b675e9b7e4` and merged publicly in `calathea-community` PR #7.
 
-The repository owner is intentionally publishing the promoted reusable source in `calathea-community` under this repository's MPL-2.0 license. The extraction changes repository/module identity and removes private-only references where required; it does not intentionally change deterministic domain semantics.
-
-Promoted tests and fixtures must pass the public-safety review tracked by #6 before the extraction is considered complete.
+The repository owner intentionally publishes the promoted reusable source in `calathea-community` under MPL-2.0. The extraction changes repository/module identity and removes private-only references where required; it does not intentionally change deterministic domain semantics.
 
 ## Consequences
 
@@ -90,7 +92,7 @@ Promoted tests and fixtures must pass the public-safety review tracked by #6 bef
 - avoids prematurely freezing a broad library API;
 - prevents the repository split from dictating domain architecture;
 - keeps the public executable independently buildable and useful;
-- permits the private repo to become thin without a duplicate core;
+- permits the private repo to remain thin without a duplicate core;
 - leaves room for a deliberately designed library facade later.
 
 ### Costs
@@ -115,7 +117,6 @@ Rejected because it creates split-brain semantics and violates the repository so
 
 ## Follow-up
 
-- #2 extracts the executable deterministic core under this boundary.
-- #5 defines the durable CLI/process compatibility contract as functional commands are introduced.
-- #3 migrates reusable product/RFC/ADR documentation.
-- private `calathea#48` removes migrated source and adopts the public process/data boundary.
+- public issue #5 defines the durable CLI/process compatibility contract as functional commands are introduced;
+- public issue #3 migrates reusable product/RFC/ADR documentation;
+- future exported Go APIs require a separate consumer-driven decision.
