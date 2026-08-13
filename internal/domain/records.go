@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"sort"
+	"time"
+)
 
 // Portfolio is the stable identity of one oriented project collection.
 type Portfolio struct {
@@ -113,30 +117,93 @@ func NewPolicySet(id PolicySetID) (PolicySet, error) {
 
 func (p PolicySet) ID() PolicySetID { return p.id }
 
-// PolicySetVersion identifies one immutable fully resolved policy configuration.
-// Policy instances are introduced by the policy semantic contract.
+// PolicySetVersion is one immutable fully resolved policy configuration. The
+// ordered instances and cumulative soft-effect bounds are stored directly so a
+// historical operation never depends on a mutable template/default.
 type PolicySetVersion struct {
-	id          PolicySetVersionID
-	policySetID PolicySetID
-	createdAt   time.Time
+	id                             PolicySetVersionID
+	policySetID                    PolicySetID
+	createdAt                      time.Time
+	instances                      []PolicyInstance
+	minimumScoreMultiplierBasisPts uint32
+	maximumScoreMultiplierBasisPts uint32
 }
 
-func NewPolicySetVersion(id PolicySetVersionID, policySetID PolicySetID, createdAt time.Time) (PolicySetVersion, error) {
-	if err := requireIdentifier("policy set version id", string(id)); err != nil {
+type PolicySetVersionInput struct {
+	ID                             PolicySetVersionID
+	PolicySet                      PolicySet
+	CreatedAt                      time.Time
+	Instances                      []PolicyInstance
+	MinimumScoreMultiplierBasisPts int
+	MaximumScoreMultiplierBasisPts int
+}
+
+func NewPolicySetVersion(input PolicySetVersionInput) (PolicySetVersion, error) {
+	if err := requireIdentifier("policy set version id", string(input.ID)); err != nil {
 		return PolicySetVersion{}, err
 	}
-	if err := requireIdentifier("policy set id", string(policySetID)); err != nil {
+	if err := requireIdentifier("policy set id", string(input.PolicySet.ID())); err != nil {
 		return PolicySetVersion{}, err
 	}
-	if createdAt.IsZero() {
+	if input.CreatedAt.IsZero() {
 		return PolicySetVersion{}, errZeroTime("policy set version created at")
 	}
-	return PolicySetVersion{id: id, policySetID: policySetID, createdAt: createdAt}, nil
+	if len(input.Instances) == 0 {
+		return PolicySetVersion{}, fmt.Errorf("policy set version requires at least one policy instance")
+	}
+	if input.MinimumScoreMultiplierBasisPts <= 0 || input.MaximumScoreMultiplierBasisPts <= 0 {
+		return PolicySetVersion{}, fmt.Errorf("policy set score multiplier bounds must be positive")
+	}
+	if input.MinimumScoreMultiplierBasisPts > input.MaximumScoreMultiplierBasisPts {
+		return PolicySetVersion{}, fmt.Errorf("policy set minimum score multiplier must not exceed maximum")
+	}
+
+	instances := append([]PolicyInstance(nil), input.Instances...)
+	seen := make(map[PolicyInstanceID]struct{}, len(instances))
+	for _, instance := range instances {
+		if err := requireIdentifier("policy instance id", string(instance.ID())); err != nil {
+			return PolicySetVersion{}, err
+		}
+		if _, exists := seen[instance.ID()]; exists {
+			return PolicySetVersion{}, fmt.Errorf("policy instance id %q is duplicated", instance.ID())
+		}
+		seen[instance.ID()] = struct{}{}
+		if !instance.Enabled() {
+			return PolicySetVersion{}, fmt.Errorf("effective policy set version must not contain disabled instance %q", instance.ID())
+		}
+	}
+	sort.SliceStable(instances, func(i, j int) bool {
+		if instances[i].Phase().order() != instances[j].Phase().order() {
+			return instances[i].Phase().order() < instances[j].Phase().order()
+		}
+		if instances[i].Priority() != instances[j].Priority() {
+			return instances[i].Priority() < instances[j].Priority()
+		}
+		if instances[i].PolicyID() != instances[j].PolicyID() {
+			return instances[i].PolicyID() < instances[j].PolicyID()
+		}
+		return instances[i].ID() < instances[j].ID()
+	})
+
+	return PolicySetVersion{
+		id:                             input.ID,
+		policySetID:                    input.PolicySet.ID(),
+		createdAt:                      input.CreatedAt,
+		instances:                      instances,
+		minimumScoreMultiplierBasisPts: uint32(input.MinimumScoreMultiplierBasisPts),
+		maximumScoreMultiplierBasisPts: uint32(input.MaximumScoreMultiplierBasisPts),
+	}, nil
 }
 
 func (v PolicySetVersion) ID() PolicySetVersionID   { return v.id }
 func (v PolicySetVersion) PolicySetID() PolicySetID { return v.policySetID }
 func (v PolicySetVersion) CreatedAt() time.Time     { return v.createdAt }
+func (v PolicySetVersion) Instances() []PolicyInstance {
+	return append([]PolicyInstance(nil), v.instances...)
+}
+func (v PolicySetVersion) ScoreMultiplierBoundsBasisPoints() (uint32, uint32) {
+	return v.minimumScoreMultiplierBasisPts, v.maximumScoreMultiplierBasisPts
+}
 
 // PolicySelectionRecord is the implementation-level record that makes the current
 // effective PolicySetVersion rebuildable. The RFC glossary intentionally does not
