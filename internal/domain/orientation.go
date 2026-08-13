@@ -41,16 +41,12 @@ func (r PlacementRecommendation) ProjectID() ProjectID { return r.projectID }
 func (r PlacementRecommendation) Placement() Placement { return r.placement }
 
 // OrientationRun is the immutable deterministic recommendation record defined by
-// RFC 0000/RFC 0002.
-//
-// #25 establishes the identity/reference foundation needed by later work: the
-// exact policy-set version, accepted evaluation-version references, per-policy
-// decision references, operation identity, recommendations, and trace are retained
-// as part of the record shape. #28 adds the remaining required run metadata
-// (planning horizon, considered subjects, semantic/schema versions, diagnostics,
-// imported/observed input references and replay identities) and the only public
-// constructor. Keeping construction unavailable here prevents an incomplete run
-// from being mistaken for a valid durable OrientationRun.
+// RFC 0000/RFC 0002. The current type establishes the identity/reference foundation
+// required by later orientation work: exact policy/evaluation decision references,
+// operation identity, recommendations, and trace are retained as part of the record
+// shape. Construction remains unavailable until the complete required run metadata
+// and validation contract are implemented, preventing an incomplete run from being
+// mistaken for a valid durable OrientationRun.
 type OrientationRun struct {
 	id                   OrientationRunID
 	portfolioID          PortfolioID
