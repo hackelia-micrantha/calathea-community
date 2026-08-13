@@ -3,11 +3,65 @@ go = "1.26.5"
 
 [tasks.format]
 description = "Format Go source"
-run = "gofmt -w cmd internal"
+run = "gofmt -w cmd internal tests"
+
+[tasks.format-check]
+description = "Verify Go source is formatted"
+run = '''
+set -eu
+unformatted="$(gofmt -l cmd internal tests)"
+if [ -n "$unformatted" ]; then
+  printf 'gofmt required:\n%s\n' "$unformatted" >&2
+  exit 1
+fi
+'''
+
+[tasks.static]
+description = "Run Go static analysis"
+run = '''
+set -eu
+go vet ./...
+go vet -tags=integration,e2e ./tests/...
+go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
+go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 -tags=integration,e2e ./tests/...
+'''
+
+[tasks.vuln]
+description = "Scan reachable Go code for known vulnerabilities"
+run = "go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./..."
 
 [tasks.test]
-description = "Run unit tests"
-run = "go test ./..."
+description = "Run the complete deterministic test pyramid"
+run = '''
+set -eu
+mise run test-unit
+mise run test-integration
+mise run test-e2e
+'''
+
+[tasks.test-unit]
+description = "Run unit tests with race detection and coverage"
+run = '''
+set -eu
+coverage="${TMPDIR:-/tmp}/calathea-unit.coverage"
+go test -count=1 -shuffle=on -race -coverprofile="$coverage" ./internal/...
+go tool cover -func="$coverage"
+'''
+
+[tasks.test-integration]
+description = "Run application/process-contract integration tests"
+run = "go test -count=1 -race -tags=integration ./tests/integration/..."
+
+[tasks.test-e2e]
+description = "Build and exercise the CLI as an OS process"
+run = "go test -count=1 -tags=e2e ./tests/e2e/..."
+
+[tasks.fuzz]
+description = "Fuzz domain construction invariants"
+run = '''
+set -eu
+go test ./internal/domain -run='^$' -fuzz=FuzzNewPlacementRecommendation -fuzztime="${FUZZ_TIME:-10s}"
+'''
 
 [tasks.build]
 description = "Build the local CLI"
@@ -17,15 +71,20 @@ go build -o "${TMPDIR:-/tmp}/calathea" ./cmd/calathea
 '''
 
 [tasks.check]
-description = "Run the local quality gate"
+description = "Run the deterministic local quality gate"
 run = '''
 set -eu
-unformatted="$(gofmt -l cmd internal)"
-if [ -n "$unformatted" ]; then
-  printf 'gofmt required:\n%s\n' "$unformatted" >&2
-  exit 1
-fi
-go vet ./...
-go test ./...
-go build -o "${TMPDIR:-/tmp}/calathea-check" ./cmd/calathea
+mise run format-check
+mise run static
+mise run test
+mise run build
+'''
+
+[tasks.ci]
+description = "Run all CI quality, security, and fuzz gates"
+run = '''
+set -eu
+mise run check
+mise run vuln
+mise run fuzz
 '''
