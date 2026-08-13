@@ -57,11 +57,14 @@ A future need for in-process Go composition is not solved by exporting the exist
 
 ## Compatibility
 
-Until structured commands are implemented, compatibility is intentionally narrow:
+The detailed compatibility rules are defined by the [CLI and Process Compatibility Contract](../architecture/cli-process-contract.md).
+
+The boundary remains intentionally narrow:
 
 - binary name `calathea` is stable;
-- documented command names and exit-code semantics become compatibility commitments when introduced;
-- structured machine-readable output must carry or reference a schema/semantic version before it is treated as stable integration surface;
+- only documented command and exit-code semantics are compatibility commitments;
+- human-facing prose is not a machine contract unless explicitly frozen;
+- structured machine-readable input/output must carry or reference an explicit schema/semantic version before it becomes stable integration surface;
 - `internal/` package paths and types carry no external compatibility guarantee.
 
 Version pinning is preferred for private composition until a stable release/version policy is established.
@@ -117,6 +120,5 @@ Rejected because it creates split-brain semantics and violates the repository so
 
 ## Follow-up
 
-- public issue #5 defines the durable CLI/process compatibility contract as functional commands are introduced;
-- public issue #3 migrates reusable product/RFC/ADR documentation;
-- future exported Go APIs require a separate consumer-driven decision.
+- the CLI/process compatibility contract defines current and future compatibility requirements for the executable boundary;
+- future exported Go APIs require a separate consumer-driven ADR satisfying the criteria in that contract.
