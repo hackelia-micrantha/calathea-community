@@ -3,14 +3,11 @@ package domain
 import "time"
 
 // PolicyException is the immutable maintainer-authorized deviation record defined
-// by RFC 0007.
-//
-// #25 establishes its identity/reference foundation. #27 adds the complete
-// exception contract (permitted deviation, selector/workflow scope, evaluator
-// compatibility, evidence/provenance, effective/expiry bounds, use limits,
-// supersession/revocation and related-decision references) and the only public
-// constructor. Keeping construction unavailable here prevents an incomplete
-// exception from being treated as valid authority.
+// by RFC 0007. The current type establishes its identity/reference foundation.
+// Construction remains unavailable until the complete exception contract covers
+// permitted deviation, scope, evaluator compatibility, evidence/provenance,
+// effective/expiry bounds, use limits, supersession/revocation, and related
+// decision references.
 type PolicyException struct {
 	id                 PolicyExceptionID
 	policySetVersionID PolicySetVersionID
@@ -30,11 +27,9 @@ func (e PolicyException) Rationale() string                      { return e.rati
 func (e PolicyException) CreatedAt() time.Time                   { return e.createdAt }
 
 // PolicyExceptionApplication records that an already-authorized exception was
-// validly used in one operation.
-//
-// #27 adds the complete applicability checks and the only public constructor so
-// scope, expiry, revocation, and use limits are evaluated before a durable
-// application record can exist.
+// validly used in one operation. Construction remains unavailable until complete
+// applicability checks ensure scope, expiry, revocation, and use limits are
+// evaluated before a durable application record can exist.
 type PolicyExceptionApplication struct {
 	id          PolicyExceptionApplicationID
 	exceptionID PolicyExceptionID
