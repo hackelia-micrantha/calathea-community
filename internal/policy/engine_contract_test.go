@@ -65,8 +65,7 @@ func TestHardDenialRecordsSuppressedSoftCompositionSteps(t *testing.T) {
 	}
 }
 
-func TestExceptionValidationRequiresEvidence(t *testing.T) {
-	engine := NewV0Engine()
+func TestExceptionConstructionRequiresEvidence(t *testing.T) {
 	version := mustBaselinePolicySet(t)
 	var confidence domain.PolicyInstance
 	for _, instance := range version.Instances() {
@@ -79,7 +78,7 @@ func TestExceptionValidationRequiresEvidence(t *testing.T) {
 		t.Fatal("confidence policy not found")
 	}
 	base := policyTestTime()
-	exception, err := domain.NewPolicyException(domain.PolicyExceptionInput{
+	_, err := domain.NewPolicyException(domain.PolicyExceptionInput{
 		ID:                 "exception-without-evidence",
 		PolicySetVersionID: version.ID(),
 		PolicyID:           confidence.PolicyID(),
@@ -95,11 +94,8 @@ func TestExceptionValidationRequiresEvidence(t *testing.T) {
 		ExpiresAt:          base.Add(24 * time.Hour),
 		MaximumUses:        1,
 	})
-	if err != nil {
-		t.Fatalf("construct incomplete exception for validation test: %v", err)
-	}
-	if err := engine.ValidateExceptionUse(version, exception, nil, nil, "project-1", confidence.Phase(), base.Add(time.Hour)); err == nil {
-		t.Fatal("exception without supporting evidence passed validity check")
+	if err == nil {
+		t.Fatal("policy exception without supporting evidence was constructible")
 	}
 }
 
