@@ -54,6 +54,23 @@ The public repository must not depend on the private repository for normal build
 
 Private code may depend on a released or pinned public-core version. A reusable capability needed by both repositories should normally move down into `calathea-community` rather than being copied upward into the private repository.
 
+## Go module and package boundary
+
+The current private implementation cannot be copied mechanically.
+
+Today its module path is `github.com/hackelia-micrantha/calathea`, and much of the reusable implementation lives under Go `internal/` packages. A sibling repository cannot import packages beneath `calathea-community/internal/...`, and the public repository cannot retain the private repository's module path as its canonical import identity.
+
+Before the executable-core migration lands:
+
+- select the public module path, expected to be `github.com/hackelia-micrantha/calathea-community` unless a deliberate vanity path is introduced;
+- define the smallest exported library/facade needed by private composition and external consumers;
+- keep implementation details under `internal/` where they do not need cross-repository use;
+- do not expose every current internal package merely to make the split compile;
+- keep the user-facing binary name `calathea` independent of the Go module/repository name;
+- migrate imports and tests deliberately and validate that the private repository can consume only supported public surfaces.
+
+A subprocess/CLI contract may be appropriate for isolated integrations, but it should not be used solely to avoid defining a coherent public Go API when in-process composition is required.
+
 ## Source-of-truth rule
 
 There must be exactly one canonical repository for a maintained path or semantic contract.
@@ -101,11 +118,11 @@ These properties are product behavior, not reasons to keep the reusable implemen
 - document ownership and transition rules;
 - create tracked migration work in both repositories.
 
-### Slice 2 — move the executable deterministic core
+### Slice 2 — define the public Go surface and move the executable deterministic core
 
-Move the Go module, CLI, domain/orientation implementation, tests, generic application boundary, and CI/tooling needed to build it independently.
+Resolve module/package ownership first, then move the Go module, CLI, reusable domain/orientation implementation, tests, generic application boundary, and CI/tooling needed to build it independently.
 
-The slice is complete only when the corresponding private copies are removed or converted into public-core consumption.
+The slice is complete only when the corresponding private copies are removed or converted into public-core consumption. Code that remains internal implementation detail should stay behind the new public API rather than being exported by default.
 
 ### Slice 3 — move reusable contracts and documentation
 
