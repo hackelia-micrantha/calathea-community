@@ -28,59 +28,91 @@ func (r PolicyDecisionResult) Valid() bool {
 	}
 }
 
+type PolicyApplicability string
+
+const (
+	PolicyApplicable    PolicyApplicability = "applicable"
+	PolicyNotApplicable PolicyApplicability = "not_applicable"
+)
+
+func (a PolicyApplicability) Valid() bool {
+	return a == PolicyApplicable || a == PolicyNotApplicable
+}
+
 // PolicyDecision is the immutable deterministic result of applying one policy
-// instance to one project in one operation. It captures evaluator identity,
-// effect class/phase, typed effects, exact deterministic inputs, missing-input
-// behavior, and evidence references so replay does not depend on ambient state.
+// instance to one project in one operation. It is self-describing enough for
+// replay/explanation without consulting mutable policy defaults or ambient
+// evaluator state.
 type PolicyDecision struct {
-	id                   PolicyDecisionID
-	policySetVersionID   PolicySetVersionID
-	policyID             PolicyID
-	policyInstanceID     PolicyInstanceID
-	evaluatorType        PolicyEvaluatorType
-	evaluatorVersion     string
-	projectID            ProjectID
-	operationID          OperationID
-	result               PolicyDecisionResult
-	effectClass          PolicyEffectClass
-	phase                PolicyPhase
-	effects              []PolicyEffect
-	reasonCode           string
-	inputReferences      []string
-	evidenceIDs          []EvidenceReferenceID
-	missingInputs        []string
-	missingInputBehavior PolicyMissingInputBehavior
-	priority             int
-	exceptionID          *PolicyExceptionID
-	createdAt            time.Time
+	id                         PolicyDecisionID
+	schemaVersion              string
+	policySetVersionID         PolicySetVersionID
+	policyID                   PolicyID
+	policyInstanceID           PolicyInstanceID
+	evaluatorType              PolicyEvaluatorType
+	evaluatorVersion           string
+	configurationSchemaVersion string
+	workflow                   PolicyWorkflow
+	phase                      PolicyPhase
+	subjectType                PolicySubjectType
+	projectID                  ProjectID
+	operationID                OperationID
+	applicability              PolicyApplicability
+	result                     PolicyDecisionResult
+	effectClass                PolicyEffectClass
+	effects                    []PolicyEffect
+	requiredInputs             []string
+	inputReferences            []string
+	evidenceIDs                []EvidenceReferenceID
+	conflictingEvidenceIDs     []EvidenceReferenceID
+	missingInputs              []string
+	missingInputBehavior       PolicyMissingInputBehavior
+	rationale                  string
+	reasonCode                 string
+	priority                   int
+	conflictKey                string
+	exceptionID                *PolicyExceptionID
+	createdAt                  time.Time
 }
 
 type PolicyDecisionInput struct {
-	ID                   PolicyDecisionID
-	PolicySetVersionID   PolicySetVersionID
-	PolicyID             PolicyID
-	PolicyInstanceID     PolicyInstanceID
-	EvaluatorType        PolicyEvaluatorType
-	EvaluatorVersion     string
-	ProjectID            ProjectID
-	OperationID          OperationID
-	Result               PolicyDecisionResult
-	EffectClass          PolicyEffectClass
-	Phase                PolicyPhase
-	Effects              []PolicyEffect
-	ReasonCode           string
-	InputReferences      []string
-	EvidenceIDs          []EvidenceReferenceID
-	MissingInputs        []string
-	MissingInputBehavior PolicyMissingInputBehavior
-	Priority             int
-	ExceptionID          *PolicyExceptionID
-	CreatedAt            time.Time
+	ID                         PolicyDecisionID
+	SchemaVersion              string
+	PolicySetVersionID         PolicySetVersionID
+	PolicyID                   PolicyID
+	PolicyInstanceID           PolicyInstanceID
+	EvaluatorType              PolicyEvaluatorType
+	EvaluatorVersion           string
+	ConfigurationSchemaVersion string
+	Workflow                   PolicyWorkflow
+	Phase                      PolicyPhase
+	SubjectType                PolicySubjectType
+	ProjectID                  ProjectID
+	OperationID                OperationID
+	Applicability              PolicyApplicability
+	Result                     PolicyDecisionResult
+	EffectClass                PolicyEffectClass
+	Effects                    []PolicyEffect
+	RequiredInputs             []string
+	InputReferences            []string
+	EvidenceIDs                []EvidenceReferenceID
+	ConflictingEvidenceIDs     []EvidenceReferenceID
+	MissingInputs              []string
+	MissingInputBehavior       PolicyMissingInputBehavior
+	Rationale                  string
+	ReasonCode                 string
+	Priority                   int
+	ConflictKey                string
+	ExceptionID                *PolicyExceptionID
+	CreatedAt                  time.Time
 }
 
 func NewPolicyDecision(input PolicyDecisionInput) (PolicyDecision, error) {
 	if err := requireIdentifier("policy decision id", string(input.ID)); err != nil {
 		return PolicyDecision{}, err
+	}
+	if input.SchemaVersion != PolicyDecisionSchemaVersionV1 {
+		return PolicyDecision{}, fmt.Errorf("unsupported policy decision schema version %q", input.SchemaVersion)
 	}
 	if err := requireIdentifier("policy set version id", string(input.PolicySetVersionID)); err != nil {
 		return PolicyDecision{}, err
@@ -97,20 +129,38 @@ func NewPolicyDecision(input PolicyDecisionInput) (PolicyDecision, error) {
 	if err := requireText("policy evaluator version", input.EvaluatorVersion); err != nil {
 		return PolicyDecision{}, err
 	}
+	if input.ConfigurationSchemaVersion != PolicyConfigurationSchemaVersionV1 {
+		return PolicyDecision{}, fmt.Errorf("unsupported policy configuration schema version %q", input.ConfigurationSchemaVersion)
+	}
+	if !input.Workflow.Valid() {
+		return PolicyDecision{}, fmt.Errorf("invalid policy workflow %q", input.Workflow)
+	}
+	if !input.Phase.Valid() {
+		return PolicyDecision{}, fmt.Errorf("invalid policy phase %q", input.Phase)
+	}
+	if !input.SubjectType.Valid() {
+		return PolicyDecision{}, fmt.Errorf("invalid policy subject type %q", input.SubjectType)
+	}
 	if err := requireIdentifier("project id", string(input.ProjectID)); err != nil {
 		return PolicyDecision{}, err
 	}
 	if err := requireIdentifier("operation id", string(input.OperationID)); err != nil {
 		return PolicyDecision{}, err
 	}
+	if !input.Applicability.Valid() {
+		return PolicyDecision{}, fmt.Errorf("invalid policy applicability %q", input.Applicability)
+	}
 	if !input.Result.Valid() {
 		return PolicyDecision{}, fmt.Errorf("invalid policy decision result %q", input.Result)
 	}
+	if input.Result == PolicyDecisionNotApplicable && input.Applicability != PolicyNotApplicable {
+		return PolicyDecision{}, fmt.Errorf("not_applicable result requires not_applicable applicability")
+	}
+	if input.Result != PolicyDecisionNotApplicable && input.Applicability != PolicyApplicable {
+		return PolicyDecision{}, fmt.Errorf("result %q requires applicable applicability", input.Result)
+	}
 	if !input.EffectClass.Valid() {
 		return PolicyDecision{}, fmt.Errorf("invalid policy effect class %q", input.EffectClass)
-	}
-	if !input.Phase.Valid() {
-		return PolicyDecision{}, fmt.Errorf("invalid policy phase %q", input.Phase)
 	}
 	if input.Priority < 0 {
 		return PolicyDecision{}, fmt.Errorf("policy decision priority must not be negative")
@@ -118,26 +168,35 @@ func NewPolicyDecision(input PolicyDecisionInput) (PolicyDecision, error) {
 	if !input.MissingInputBehavior.Valid() {
 		return PolicyDecision{}, fmt.Errorf("invalid missing-input behavior %q", input.MissingInputBehavior)
 	}
+	if err := requireText("policy rationale", input.Rationale); err != nil {
+		return PolicyDecision{}, err
+	}
 	if err := requireText("policy reason code", input.ReasonCode); err != nil {
 		return PolicyDecision{}, err
 	}
 	if input.CreatedAt.IsZero() {
 		return PolicyDecision{}, errZeroTime("policy decision time")
 	}
-	for _, reference := range input.InputReferences {
-		if err := requireText("policy decision input reference", reference); err != nil {
-			return PolicyDecision{}, err
-		}
+	if len(input.RequiredInputs) == 0 {
+		return PolicyDecision{}, fmt.Errorf("policy decision requires explicit required-input declarations")
 	}
-	for _, evidenceID := range input.EvidenceIDs {
-		if err := requireIdentifier("policy decision evidence reference id", string(evidenceID)); err != nil {
-			return PolicyDecision{}, err
-		}
+	if err := validateUniqueStrings("policy required input", input.RequiredInputs); err != nil {
+		return PolicyDecision{}, err
 	}
-	for _, missing := range input.MissingInputs {
-		if err := requireText("policy missing input", missing); err != nil {
-			return PolicyDecision{}, err
-		}
+	if err := validateUniqueStrings("policy decision input reference", input.InputReferences); err != nil {
+		return PolicyDecision{}, err
+	}
+	if err := validateUniqueEvidenceIDs("policy decision evidence reference id", input.EvidenceIDs); err != nil {
+		return PolicyDecision{}, err
+	}
+	if err := validateUniqueEvidenceIDs("policy decision conflicting evidence reference id", input.ConflictingEvidenceIDs); err != nil {
+		return PolicyDecision{}, err
+	}
+	if err := validateUniqueStrings("policy missing input", input.MissingInputs); err != nil {
+		return PolicyDecision{}, err
+	}
+	if input.Result == PolicyDecisionIndeterminate && len(input.MissingInputs) == 0 && len(input.ConflictingEvidenceIDs) == 0 {
+		return PolicyDecision{}, fmt.Errorf("indeterminate policy decision requires missing or conflicting input evidence")
 	}
 	for _, effect := range input.Effects {
 		switch effect.Kind() {
@@ -164,59 +223,114 @@ func NewPolicyDecision(input PolicyDecisionInput) (PolicyDecision, error) {
 	if input.Result == PolicyDecisionRequireReview && input.EffectClass != PolicyEffectReviewRequired {
 		return PolicyDecision{}, fmt.Errorf("require_review decision requires review_required effect class")
 	}
+	if input.ConflictKey != "" {
+		if err := requireText("policy conflict key", input.ConflictKey); err != nil {
+			return PolicyDecision{}, err
+		}
+	}
 	if input.ExceptionID != nil {
 		if err := requireIdentifier("policy exception id", string(*input.ExceptionID)); err != nil {
 			return PolicyDecision{}, err
 		}
 	}
 	return PolicyDecision{
-		id:                   input.ID,
-		policySetVersionID:   input.PolicySetVersionID,
-		policyID:             input.PolicyID,
-		policyInstanceID:     input.PolicyInstanceID,
-		evaluatorType:        input.EvaluatorType,
-		evaluatorVersion:     input.EvaluatorVersion,
-		projectID:            input.ProjectID,
-		operationID:          input.OperationID,
-		result:               input.Result,
-		effectClass:          input.EffectClass,
-		phase:                input.Phase,
-		effects:              clonePolicyEffects(input.Effects),
-		reasonCode:           input.ReasonCode,
-		inputReferences:      cloneStrings(input.InputReferences),
-		evidenceIDs:          cloneEvidenceIDs(input.EvidenceIDs),
-		missingInputs:        cloneStrings(input.MissingInputs),
-		missingInputBehavior: input.MissingInputBehavior,
-		priority:             input.Priority,
-		exceptionID:          clonePolicyExceptionID(input.ExceptionID),
-		createdAt:            input.CreatedAt,
+		id:                         input.ID,
+		schemaVersion:              input.SchemaVersion,
+		policySetVersionID:         input.PolicySetVersionID,
+		policyID:                   input.PolicyID,
+		policyInstanceID:           input.PolicyInstanceID,
+		evaluatorType:              input.EvaluatorType,
+		evaluatorVersion:           input.EvaluatorVersion,
+		configurationSchemaVersion: input.ConfigurationSchemaVersion,
+		workflow:                   input.Workflow,
+		phase:                      input.Phase,
+		subjectType:                input.SubjectType,
+		projectID:                  input.ProjectID,
+		operationID:                input.OperationID,
+		applicability:              input.Applicability,
+		result:                     input.Result,
+		effectClass:                input.EffectClass,
+		effects:                    clonePolicyEffects(input.Effects),
+		requiredInputs:             cloneStrings(input.RequiredInputs),
+		inputReferences:            cloneStrings(input.InputReferences),
+		evidenceIDs:                cloneEvidenceIDs(input.EvidenceIDs),
+		conflictingEvidenceIDs:     cloneEvidenceIDs(input.ConflictingEvidenceIDs),
+		missingInputs:              cloneStrings(input.MissingInputs),
+		missingInputBehavior:       input.MissingInputBehavior,
+		rationale:                  input.Rationale,
+		reasonCode:                 input.ReasonCode,
+		priority:                   input.Priority,
+		conflictKey:                input.ConflictKey,
+		exceptionID:                clonePolicyExceptionID(input.ExceptionID),
+		createdAt:                  input.CreatedAt,
 	}, nil
 }
 
 func (d PolicyDecision) ID() PolicyDecisionID                   { return d.id }
+func (d PolicyDecision) SchemaVersion() string                  { return d.schemaVersion }
 func (d PolicyDecision) PolicySetVersionID() PolicySetVersionID { return d.policySetVersionID }
 func (d PolicyDecision) PolicyID() PolicyID                     { return d.policyID }
 func (d PolicyDecision) PolicyInstanceID() PolicyInstanceID     { return d.policyInstanceID }
 func (d PolicyDecision) EvaluatorType() PolicyEvaluatorType     { return d.evaluatorType }
 func (d PolicyDecision) EvaluatorVersion() string               { return d.evaluatorVersion }
+func (d PolicyDecision) ConfigurationSchemaVersion() string     { return d.configurationSchemaVersion }
+func (d PolicyDecision) Workflow() PolicyWorkflow               { return d.workflow }
+func (d PolicyDecision) Phase() PolicyPhase                     { return d.phase }
+func (d PolicyDecision) SubjectType() PolicySubjectType         { return d.subjectType }
 func (d PolicyDecision) ProjectID() ProjectID                   { return d.projectID }
 func (d PolicyDecision) OperationID() OperationID               { return d.operationID }
+func (d PolicyDecision) Applicability() PolicyApplicability     { return d.applicability }
 func (d PolicyDecision) Result() PolicyDecisionResult           { return d.result }
 func (d PolicyDecision) EffectClass() PolicyEffectClass         { return d.effectClass }
-func (d PolicyDecision) Phase() PolicyPhase                     { return d.phase }
 func (d PolicyDecision) Effects() []PolicyEffect                { return clonePolicyEffects(d.effects) }
-func (d PolicyDecision) ReasonCode() string                     { return d.reasonCode }
+func (d PolicyDecision) RequiredInputs() []string               { return cloneStrings(d.requiredInputs) }
 func (d PolicyDecision) InputReferences() []string              { return cloneStrings(d.inputReferences) }
 func (d PolicyDecision) EvidenceIDs() []EvidenceReferenceID     { return cloneEvidenceIDs(d.evidenceIDs) }
-func (d PolicyDecision) MissingInputs() []string                { return cloneStrings(d.missingInputs) }
-func (d PolicyDecision) MissingInputBehavior() PolicyMissingInputBehavior { return d.missingInputBehavior }
-func (d PolicyDecision) Priority() int                          { return d.priority }
-func (d PolicyDecision) ExceptionID() *PolicyExceptionID        { return clonePolicyExceptionID(d.exceptionID) }
-func (d PolicyDecision) CreatedAt() time.Time                   { return d.createdAt }
+func (d PolicyDecision) ConflictingEvidenceIDs() []EvidenceReferenceID {
+	return cloneEvidenceIDs(d.conflictingEvidenceIDs)
+}
+func (d PolicyDecision) MissingInputs() []string { return cloneStrings(d.missingInputs) }
+func (d PolicyDecision) MissingInputBehavior() PolicyMissingInputBehavior {
+	return d.missingInputBehavior
+}
+func (d PolicyDecision) Rationale() string                   { return d.rationale }
+func (d PolicyDecision) ReasonCode() string                  { return d.reasonCode }
+func (d PolicyDecision) Priority() int                       { return d.priority }
+func (d PolicyDecision) ConflictKey() string                 { return d.conflictKey }
+func (d PolicyDecision) ExceptionID() *PolicyExceptionID     { return clonePolicyExceptionID(d.exceptionID) }
+func (d PolicyDecision) CreatedAt() time.Time                { return d.createdAt }
 
 func clonePolicyEffects(values []PolicyEffect) []PolicyEffect {
 	if len(values) == 0 {
 		return nil
 	}
 	return append([]PolicyEffect(nil), values...)
+}
+
+func validateUniqueStrings(kind string, values []string) error {
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if err := requireText(kind, value); err != nil {
+			return err
+		}
+		if _, exists := seen[value]; exists {
+			return fmt.Errorf("%s %q is duplicated", kind, value)
+		}
+		seen[value] = struct{}{}
+	}
+	return nil
+}
+
+func validateUniqueEvidenceIDs(kind string, values []EvidenceReferenceID) error {
+	seen := make(map[EvidenceReferenceID]struct{}, len(values))
+	for _, value := range values {
+		if err := requireIdentifier(kind, string(value)); err != nil {
+			return err
+		}
+		if _, exists := seen[value]; exists {
+			return fmt.Errorf("%s %q is duplicated", kind, value)
+		}
+		seen[value] = struct{}{}
+	}
+	return nil
 }
