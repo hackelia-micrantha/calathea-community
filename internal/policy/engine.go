@@ -23,6 +23,20 @@ const (
 	PolicyEvaluationFreshness  domain.PolicyID = "orientation.evaluation.freshness"
 )
 
+type baselineRequirement struct {
+	policyID      domain.PolicyID
+	evaluatorType domain.PolicyEvaluatorType
+}
+
+var baselineRequirements = []baselineRequirement{
+	{policyID: PolicyLifecycleEligibility, evaluatorType: domain.PolicyEvaluatorLifecycleEligibility},
+	{policyID: PolicyEvaluationRequired, evaluatorType: domain.PolicyEvaluatorRequiredEvaluation},
+	{policyID: PolicyEvaluationConfidence, evaluatorType: domain.PolicyEvaluatorConfidenceGate},
+	{policyID: PolicyEvaluationFreshness, evaluatorType: domain.PolicyEvaluatorFreshnessRule},
+	{policyID: PolicyCapacityNow, evaluatorType: domain.PolicyEvaluatorCapacityLimit},
+	{policyID: PolicyCapacityNext, evaluatorType: domain.PolicyEvaluatorCapacityLimit},
+}
+
 type evaluatorKey struct {
 	typeName domain.PolicyEvaluatorType
 	version  string
@@ -249,14 +263,14 @@ type MultiplierCompositionStep struct {
 }
 
 type CompositeOutcome struct {
-	Denied                 bool
-	Excluded               bool
-	ReviewRequired         bool
-	Indeterminate          bool
-	SoftEffectsSuppressed  bool
-	ScoreMultiplier        ExactMultiplier
-	MultiplierSteps        []MultiplierCompositionStep
-	SuppressedDecisionIDs  []domain.PolicyDecisionID
+	Denied                bool
+	Excluded              bool
+	ReviewRequired        bool
+	Indeterminate         bool
+	SoftEffectsSuppressed bool
+	ScoreMultiplier       ExactMultiplier
+	MultiplierSteps       []MultiplierCompositionStep
+	SuppressedDecisionIDs []domain.PolicyDecisionID
 }
 
 type EvaluationResult struct {
@@ -270,13 +284,9 @@ func (e *Engine) ValidatePolicySetVersion(version domain.PolicySetVersion) error
 		return fmt.Errorf("policy set version %q contains no policy instances", version.ID())
 	}
 
-	required := map[domain.PolicyID]domain.PolicyEvaluatorType{
-		PolicyCapacityNow:          domain.PolicyEvaluatorCapacityLimit,
-		PolicyCapacityNext:         domain.PolicyEvaluatorCapacityLimit,
-		PolicyEvaluationRequired:   domain.PolicyEvaluatorRequiredEvaluation,
-		PolicyLifecycleEligibility: domain.PolicyEvaluatorLifecycleEligibility,
-		PolicyEvaluationConfidence: domain.PolicyEvaluatorConfidenceGate,
-		PolicyEvaluationFreshness:  domain.PolicyEvaluatorFreshnessRule,
+	required := make(map[domain.PolicyID]domain.PolicyEvaluatorType, len(baselineRequirements))
+	for _, requirement := range baselineRequirements {
+		required[requirement.policyID] = requirement.evaluatorType
 	}
 	seenRequired := make(map[domain.PolicyID]int, len(required))
 	conflictKeys := make(map[string]domain.PolicyInstanceID)
@@ -318,9 +328,9 @@ func (e *Engine) ValidatePolicySetVersion(version domain.PolicySetVersion) error
 			}
 		}
 	}
-	for policyID := range required {
-		if seenRequired[policyID] != 1 {
-			return fmt.Errorf("baseline policy %q must appear exactly once; found %d", policyID, seenRequired[policyID])
+	for _, requirement := range baselineRequirements {
+		if seenRequired[requirement.policyID] != 1 {
+			return fmt.Errorf("baseline policy %q must appear exactly once; found %d", requirement.policyID, seenRequired[requirement.policyID])
 		}
 	}
 	minimum, maximum := version.ScoreMultiplierBoundsBasisPoints()
@@ -342,6 +352,9 @@ func validateInstanceShape(instance domain.PolicyInstance) error {
 	}
 	if instance.SubjectType() != domain.PolicySubjectProject {
 		return fmt.Errorf("unsupported policy subject type %q", instance.SubjectType())
+	}
+	if len(instance.RequiredInputs()) == 0 {
+		return fmt.Errorf("policy instance requires explicit required-input declarations")
 	}
 	switch instance.EvaluatorType() {
 	case domain.PolicyEvaluatorCapacityLimit:
@@ -631,10 +644,6 @@ func Compose(version domain.PolicySetVersion, decisions []domain.PolicyDecision)
 		}
 	}
 
-	minimum, maximum := version.ScoreMultiplierBoundsBasisPoints()
-	if ratioLessThanBasisPoints(outcome.ScoreMultiplier, minimum) || ratioGreaterThanBasisPoints(outcome.ScoreMultiplier, maximum) {
-		return CompositeOutcome{}, fmt.Errorf("composed score multiplier %s is outside policy-set bounds %d-%d basis points", outcome.ScoreMultiplier.String(), minimum, maximum)
-	}
 	if (outcome.Denied || outcome.Excluded) && outcome.ScoreMultiplier.numerator != outcome.ScoreMultiplier.denominator {
 		outcome.SoftEffectsSuppressed = true
 		for i := range outcome.MultiplierSteps {
@@ -646,6 +655,10 @@ func Compose(version domain.PolicySetVersion, decisions []domain.PolicyDecision)
 			outcome.SuppressedDecisionIDs = appendUniqueDecisionID(outcome.SuppressedDecisionIDs, outcome.MultiplierSteps[i].DecisionID)
 		}
 		outcome.ScoreMultiplier = ExactMultiplier{numerator: 1, denominator: 1}
+	}
+	minimum, maximum := version.ScoreMultiplierBoundsBasisPoints()
+	if ratioLessThanBasisPoints(outcome.ScoreMultiplier, minimum) || ratioGreaterThanBasisPoints(outcome.ScoreMultiplier, maximum) {
+		return CompositeOutcome{}, fmt.Errorf("composed score multiplier %s is outside policy-set bounds %d-%d basis points", outcome.ScoreMultiplier.String(), minimum, maximum)
 	}
 	return cloneOutcome(outcome), nil
 }
@@ -717,10 +730,19 @@ func (e *Engine) ValidateExceptionUse(version domain.PolicySetVersion, exception
 	if !exception.EffectiveAtTime(at) {
 		return fmt.Errorf("policy exception %q is not effective at %s", exception.ID(), at.UTC().Format(time.RFC3339))
 	}
+	var earliestRevocation *time.Time
 	for _, revocation := range revocations {
-		if revocation.ExceptionID() == exception.ID() && !revocation.RevokedAt().After(at) {
-			return fmt.Errorf("policy exception %q was revoked at %s", exception.ID(), revocation.RevokedAt().UTC().Format(time.RFC3339))
+		if revocation.ExceptionID() != exception.ID() || revocation.RevokedAt().After(at) {
+			continue
 		}
+		revokedAt := revocation.RevokedAt()
+		if earliestRevocation == nil || revokedAt.Before(*earliestRevocation) {
+			copyTime := revokedAt
+			earliestRevocation = &copyTime
+		}
+	}
+	if earliestRevocation != nil {
+		return fmt.Errorf("policy exception %q was revoked at %s", exception.ID(), earliestRevocation.UTC().Format(time.RFC3339))
 	}
 	var uses uint32
 	for _, application := range applications {
@@ -883,7 +905,7 @@ func evaluateFreshnessRule(instance domain.PolicyInstance, input evaluationInput
 		return evaluatorOutput{
 			result:        domain.PolicyDecisionIndeterminate,
 			reasonCode:    "freshness_unavailable",
-			missingInputs: []string{"accepted_evaluation", "evaluation_evidence_as_of"},
+			missingInputs: []string{"accepted_evaluation", "evaluation_evidence_as_of", "planning_horizon"},
 		}, nil
 	}
 	evidenceAsOf := input.evaluation.Freshness().EvidenceAsOf()
@@ -899,6 +921,7 @@ func evaluateFreshnessRule(instance domain.PolicyInstance, input evaluationInput
 		effects: []domain.PolicyEffect{diagnostic},
 		inputReferences: []string{
 			"evaluation_version:" + string(input.evaluation.ID()),
+			"planning_horizon:" + input.evaluation.PlanningHorizon(),
 			"evidence_as_of:" + evidenceAsOf.UTC().Format(time.RFC3339Nano),
 			"policy_evaluation_time:" + input.asOf.UTC().Format(time.RFC3339Nano),
 			"freshness_max_age_seconds:" + strconv.FormatInt(int64(parameters.MaximumAge()/time.Second), 10),
@@ -923,8 +946,8 @@ func evaluateScoreMultiplier(instance domain.PolicyInstance, input evaluationInp
 	if input.evaluation == nil {
 		return evaluatorOutput{
 			result:        domain.PolicyDecisionIndeterminate,
-			reasonCode:    "effective_score_unavailable",
-			missingInputs: []string{"effective_score"},
+			reasonCode:    "base_score_unavailable",
+			missingInputs: []string{"accepted_evaluation", "base_score"},
 		}, nil
 	}
 	effect, err := domain.NewScoreMultiplierPolicyEffect(int(parameters.BasisPoints()))
@@ -932,8 +955,8 @@ func evaluateScoreMultiplier(instance domain.PolicyInstance, input evaluationInp
 		return evaluatorOutput{}, err
 	}
 	return evaluatorOutput{
-		result: domain.PolicyDecisionAdjust,
-		effects: []domain.PolicyEffect{effect},
+		result:     domain.PolicyDecisionAdjust,
+		effects:    []domain.PolicyEffect{effect},
 		reasonCode: "score_multiplier_applied",
 		inputReferences: []string{
 			"evaluation_version:" + string(input.evaluation.ID()),
