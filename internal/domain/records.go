@@ -154,8 +154,15 @@ func NewPolicySetVersion(input PolicySetVersionInput) (PolicySetVersion, error) 
 	if input.MinimumScoreMultiplierBasisPts <= 0 || input.MaximumScoreMultiplierBasisPts <= 0 {
 		return PolicySetVersion{}, fmt.Errorf("policy set score multiplier bounds must be positive")
 	}
+	maxUint32 := uint64(^uint32(0))
+	if uint64(input.MinimumScoreMultiplierBasisPts) > maxUint32 || uint64(input.MaximumScoreMultiplierBasisPts) > maxUint32 {
+		return PolicySetVersion{}, fmt.Errorf("policy set score multiplier bounds exceed supported uint32 range")
+	}
 	if input.MinimumScoreMultiplierBasisPts > input.MaximumScoreMultiplierBasisPts {
 		return PolicySetVersion{}, fmt.Errorf("policy set minimum score multiplier must not exceed maximum")
+	}
+	if input.MinimumScoreMultiplierBasisPts > 10000 || input.MaximumScoreMultiplierBasisPts < 10000 {
+		return PolicySetVersion{}, fmt.Errorf("policy set score multiplier bounds must include neutral 10000 basis points")
 	}
 
 	instances := append([]PolicyInstance(nil), input.Instances...)
