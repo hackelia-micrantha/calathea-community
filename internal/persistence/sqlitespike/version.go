@@ -2,6 +2,7 @@ package sqlitespike
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -12,7 +13,7 @@ func (s *Store) SQLiteVersion(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("read sqlite runtime version: %w", err)
 	}
 	if strings.TrimSpace(version) == "" {
-		return "", fmt.Errorf("sqlite runtime version is empty")
+		return "", errors.New("sqlite runtime version is empty")
 	}
 	return version, nil
 }
