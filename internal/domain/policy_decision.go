@@ -28,6 +28,27 @@ func (r PolicyDecisionResult) Valid() bool {
 	}
 }
 
+// PolicyInputReference retains the exact deterministic value/reference consumed
+// for one declared policy input kind. Values are intentionally opaque to the
+// durable decision record; the evaluator version owns their interpretation.
+type PolicyInputReference struct {
+	kind  PolicyInputKind
+	value string
+}
+
+func NewPolicyInputReference(kind PolicyInputKind, value string) (PolicyInputReference, error) {
+	if !kind.Valid() {
+		return PolicyInputReference{}, fmt.Errorf("invalid policy input kind %q", kind)
+	}
+	if err := requireText("policy input reference value", value); err != nil {
+		return PolicyInputReference{}, err
+	}
+	return PolicyInputReference{kind: kind, value: value}, nil
+}
+
+func (r PolicyInputReference) Kind() PolicyInputKind { return r.kind }
+func (r PolicyInputReference) Value() string         { return r.value }
+
 // PolicyDecision is the immutable deterministic result of applying one exact
 // configured policy instance to one typed subject in an operation. It retains
 // enough evaluator/configuration/input identity for later composition and replay
@@ -47,6 +68,7 @@ type PolicyDecision struct {
 	result               PolicyDecisionResult
 	reasonCode           string
 	requiredInputs       []PolicyInputKind
+	inputReferences      []PolicyInputReference
 	missingInputs        []PolicyInputKind
 	evidenceIDs          []EvidenceReferenceID
 	effects              []PolicyEffect
@@ -70,6 +92,7 @@ type PolicyDecisionInput struct {
 	Result               PolicyDecisionResult
 	ReasonCode           string
 	RequiredInputs       []PolicyInputKind
+	InputReferences      []PolicyInputReference
 	MissingInputs        []PolicyInputKind
 	EvidenceIDs          []EvidenceReferenceID
 	Effects              []PolicyEffect
@@ -133,20 +156,53 @@ func NewPolicyDecision(input PolicyDecisionInput) (PolicyDecision, error) {
 	if err := validatePolicyInputKinds("missing policy input", input.MissingInputs); err != nil {
 		return PolicyDecision{}, err
 	}
+
 	required := make(map[PolicyInputKind]struct{}, len(input.RequiredInputs))
 	for _, kind := range input.RequiredInputs {
 		required[kind] = struct{}{}
 	}
+	missing := make(map[PolicyInputKind]struct{}, len(input.MissingInputs))
 	for _, kind := range input.MissingInputs {
 		if _, ok := required[kind]; !ok {
 			return PolicyDecision{}, fmt.Errorf("missing policy input %q was not declared required", kind)
 		}
+		missing[kind] = struct{}{}
 	}
+
+	referenced := make(map[PolicyInputKind]struct{}, len(input.InputReferences))
+	for _, reference := range input.InputReferences {
+		if !reference.kind.Valid() {
+			return PolicyDecision{}, fmt.Errorf("invalid policy input reference kind %q", reference.kind)
+		}
+		if err := requireText("policy input reference value", reference.value); err != nil {
+			return PolicyDecision{}, err
+		}
+		if _, ok := required[reference.kind]; !ok {
+			return PolicyDecision{}, fmt.Errorf("policy input reference %q was not declared required", reference.kind)
+		}
+		if _, exists := referenced[reference.kind]; exists {
+			return PolicyDecision{}, fmt.Errorf("policy input reference %q is duplicated", reference.kind)
+		}
+		if _, isMissing := missing[reference.kind]; isMissing {
+			return PolicyDecision{}, fmt.Errorf("policy input %q cannot be both referenced and missing", reference.kind)
+		}
+		referenced[reference.kind] = struct{}{}
+	}
+
 	if input.Result == PolicyDecisionIndeterminate && len(input.MissingInputs) == 0 {
 		return PolicyDecision{}, fmt.Errorf("indeterminate policy decision requires at least one missing input")
 	}
 	if input.Result != PolicyDecisionIndeterminate && len(input.MissingInputs) != 0 {
 		return PolicyDecision{}, fmt.Errorf("non-indeterminate policy decision must not report missing inputs")
+	}
+	if input.Result != PolicyDecisionNotApplicable {
+		for _, kind := range input.RequiredInputs {
+			_, hasReference := referenced[kind]
+			_, isMissing := missing[kind]
+			if !hasReference && !isMissing {
+				return PolicyDecision{}, fmt.Errorf("required policy input %q lacks a retained reference or missing marker", kind)
+			}
+		}
 	}
 	if err := validateEvidenceIDs(input.EvidenceIDs); err != nil {
 		return PolicyDecision{}, err
@@ -181,6 +237,7 @@ func NewPolicyDecision(input PolicyDecisionInput) (PolicyDecision, error) {
 		result:               input.Result,
 		reasonCode:           input.ReasonCode,
 		requiredInputs:       clonePolicyInputKinds(input.RequiredInputs),
+		inputReferences:      clonePolicyInputReferences(input.InputReferences),
 		missingInputs:        clonePolicyInputKinds(input.MissingInputs),
 		evidenceIDs:          cloneEvidenceIDs(input.EvidenceIDs),
 		effects:              clonePolicyEffects(input.Effects),
@@ -201,23 +258,24 @@ func (d PolicyDecision) EffectClass() PolicyEffectClass         { return d.effec
 func (d PolicyDecision) MissingInputBehavior() PolicyMissingInputBehavior {
 	return d.missingInputBehavior
 }
-func (d PolicyDecision) Subject() PolicySubject               { return d.subject }
+func (d PolicyDecision) Subject() PolicySubject { return d.subject }
 func (d PolicyDecision) ProjectID() ProjectID {
 	if d.subject.Type() != PolicySubjectProject {
 		return ""
 	}
 	return ProjectID(d.subject.ID())
 }
-func (d PolicyDecision) OperationID() OperationID             { return d.operationID }
-func (d PolicyDecision) Result() PolicyDecisionResult         { return d.result }
-func (d PolicyDecision) ReasonCode() string                   { return d.reasonCode }
-func (d PolicyDecision) RequiredInputs() []PolicyInputKind    { return clonePolicyInputKinds(d.requiredInputs) }
-func (d PolicyDecision) MissingInputs() []PolicyInputKind     { return clonePolicyInputKinds(d.missingInputs) }
-func (d PolicyDecision) EvidenceIDs() []EvidenceReferenceID   { return cloneEvidenceIDs(d.evidenceIDs) }
-func (d PolicyDecision) Effects() []PolicyEffect              { return clonePolicyEffects(d.effects) }
-func (d PolicyDecision) Priority() int                        { return d.priority }
-func (d PolicyDecision) Rationale() string                    { return d.rationale }
-func (d PolicyDecision) CreatedAt() time.Time                 { return d.createdAt }
+func (d PolicyDecision) OperationID() OperationID                  { return d.operationID }
+func (d PolicyDecision) Result() PolicyDecisionResult              { return d.result }
+func (d PolicyDecision) ReasonCode() string                        { return d.reasonCode }
+func (d PolicyDecision) RequiredInputs() []PolicyInputKind         { return clonePolicyInputKinds(d.requiredInputs) }
+func (d PolicyDecision) InputReferences() []PolicyInputReference   { return clonePolicyInputReferences(d.inputReferences) }
+func (d PolicyDecision) MissingInputs() []PolicyInputKind          { return clonePolicyInputKinds(d.missingInputs) }
+func (d PolicyDecision) EvidenceIDs() []EvidenceReferenceID        { return cloneEvidenceIDs(d.evidenceIDs) }
+func (d PolicyDecision) Effects() []PolicyEffect                   { return clonePolicyEffects(d.effects) }
+func (d PolicyDecision) Priority() int                             { return d.priority }
+func (d PolicyDecision) Rationale() string                         { return d.rationale }
+func (d PolicyDecision) CreatedAt() time.Time                      { return d.createdAt }
 
 func validatePolicyInputKinds(kind string, values []PolicyInputKind) error {
 	seen := make(map[PolicyInputKind]struct{}, len(values))
@@ -245,4 +303,11 @@ func validateEvidenceIDs(values []EvidenceReferenceID) error {
 		seen[value] = struct{}{}
 	}
 	return nil
+}
+
+func clonePolicyInputReferences(values []PolicyInputReference) []PolicyInputReference {
+	if len(values) == 0 {
+		return nil
+	}
+	return append([]PolicyInputReference(nil), values...)
 }
