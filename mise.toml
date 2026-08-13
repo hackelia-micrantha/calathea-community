@@ -1,0 +1,31 @@
+[tools]
+go = "1.26.5"
+
+[tasks.format]
+description = "Format Go source"
+run = "gofmt -w cmd internal"
+
+[tasks.test]
+description = "Run unit tests"
+run = "go test ./..."
+
+[tasks.build]
+description = "Build the local CLI"
+run = '''
+set -eu
+go build -o "${TMPDIR:-/tmp}/calathea" ./cmd/calathea
+'''
+
+[tasks.check]
+description = "Run the local quality gate"
+run = '''
+set -eu
+unformatted="$(gofmt -l cmd internal)"
+if [ -n "$unformatted" ]; then
+  printf 'gofmt required:\n%s\n' "$unformatted" >&2
+  exit 1
+fi
+go vet ./...
+go test ./...
+go build -o "${TMPDIR:-/tmp}/calathea-check" ./cmd/calathea
+'''

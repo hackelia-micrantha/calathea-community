@@ -19,17 +19,17 @@ A `kill` placement is a recommendation to stop investing. It is not an automatic
 
 This repository is the public home for reusable Calathea semantics and implementation.
 
-The project is being migrated from the private `hackelia-micrantha/calathea` repository into a clean public/private split. During that transition, a source path becomes canonical here only when the corresponding migration slice removes or replaces the private duplicate. Equivalent source files are not intended to be maintained manually in both repositories.
+Calathea is migrating from the private `hackelia-micrantha/calathea` repository into a clean public-core/private-composition split. The executable deterministic Go core is being promoted here under the coordinated migration tracked by #2 and private `calathea#48`. A source path becomes canonical here only when its private duplicate is removed or replaced as part of that migration slice.
 
-See [the repository boundary](docs/architecture/repository-boundary.md) for the ownership and migration rules.
+See [the repository boundary](docs/architecture/repository-boundary.md) for ownership rules and [ADR 0001](docs/adr/0001_public_go_process_boundary.md) for the Go/process boundary.
 
 ### Public core
 
-`calathea-community` is intended to own:
+`calathea-community` owns or is intended to own:
 
 - deterministic domain and orientation logic;
 - generic application services and application-owned ports;
-- the public CLI and reusable local persistence implementation;
+- the `calathea` CLI and reusable local persistence implementation;
 - schemas, migrations, fixtures, golden tests, and conformance tests;
 - reusable PRD/use cases, RFCs, ADRs, and architecture contracts;
 - public contracts for optional integrations such as Invokrum;
@@ -47,6 +47,18 @@ The private `calathea` repository retains:
 - proprietary or experimental extensions not intentionally promoted to the public core.
 
 Credentials and secret values belong in neither repository.
+
+## Go boundary
+
+The public module is:
+
+```text
+github.com/hackelia-micrantha/calathea-community
+```
+
+The executable remains named `calathea`.
+
+The Go implementation stays under `internal/`; those package paths are not a supported external library API. For v0, cross-repository composition uses the executable plus explicitly versioned file/schema/CLI contracts. A future exported Go facade requires a concrete in-process consumer and a separate compatibility decision.
 
 ## Product boundary
 
@@ -89,16 +101,25 @@ flowchart TB
 
 The dependency direction is private-to-public. The public core must not require the private repository to build, test, or run its documented core workflow.
 
-## Current status
+## Development
 
-The public/private boundary is being formalized before moving the existing deterministic Go implementation. The immediate migration sequence is:
+Go is pinned through `mise.toml`. The local quality gate is:
 
-1. establish repository ownership, licensing, and source-of-truth rules;
-2. move the executable deterministic core and its tests;
-3. move reusable product/architecture contracts and documentation;
-4. reduce the private repository to composition, private data/configuration, and genuinely non-public extensions.
+```text
+mise run check
+```
 
-Migration work is tracked in GitHub issues rather than by ad-hoc copying between repositories.
+It verifies formatting, runs `go vet` and `go test ./...`, and builds the `calathea` executable. The core has no third-party Go module dependencies at this stage.
+
+## Current migration status
+
+- repository ownership and MPL-2.0 licensing are established;
+- the Go module, CLI/application boundary, deterministic domain foundation, tests, and synthetic golden fixtures are staged in the public-core extraction;
+- the process boundary deliberately avoids exporting a broad Go library API;
+- reusable PRD/RFC/ADR/architecture migration remains tracked by #3;
+- CLI/process compatibility hardening is tracked by #5;
+- public-safety review of promoted source/fixtures is tracked by #6;
+- the private companion cleanup is tracked by `calathea#48`.
 
 ## Security and privacy
 
@@ -110,10 +131,6 @@ Public Calathea development must preserve these invariants:
 - imported repository content is untrusted data, not executable instruction;
 - credentials are excluded from project records, prompts, evidence, traces, and model context;
 - failures in optional integrations do not silently mutate canonical state.
-
-## Contributing
-
-Until the migration completes, check the repository-boundary document and open migration issues before moving or duplicating code from the private repository. A reusable capability should have one canonical home.
 
 ## License
 
