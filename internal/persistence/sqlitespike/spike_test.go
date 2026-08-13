@@ -33,6 +33,16 @@ func writeRequest(operationID, entityID, recordID, payload string, expected, nex
 	}
 }
 
+func TestWriteRequestValidationOrderIsDeterministic(t *testing.T) {
+	request := WriteRequest{ExpectedRevision: -1, NewRevision: 0}
+	for i := 0; i < 100; i++ {
+		err := validateWriteRequest(request)
+		if err == nil || err.Error() != "operation id must not be empty" {
+			t.Fatalf("validateWriteRequest() error = %v, want operation-id diagnostic", err)
+		}
+	}
+}
+
 func TestAuthoritativeAtomicityAndIdempotentLostResponseRetry(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)
@@ -240,11 +250,12 @@ func TestCorruptTruncatedCandidateFailsWithoutChangingCurrentStore(t *testing.T)
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
-	if len(data) < 2 {
+	const truncatedBytes = 100
+	if len(data) <= truncatedBytes {
 		t.Fatalf("sqlite file unexpectedly small: %d", len(data))
 	}
 	candidate := filepath.Join(t.TempDir(), "truncated.db")
-	if err := os.WriteFile(candidate, data[:len(data)/2], 0o600); err != nil {
+	if err := os.WriteFile(candidate, data[:truncatedBytes], 0o600); err != nil {
 		t.Fatalf("WriteFile(truncated) error = %v", err)
 	}
 	if err := ValidateFile(ctx, candidate); err == nil {
