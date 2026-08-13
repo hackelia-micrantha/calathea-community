@@ -240,14 +240,23 @@ A deterministic operation is replayable only when Calathea retains or can resolv
 - required imported observations or content identities;
 - operation parameters.
 
-Replay outcomes:
+### Replay status
 
-- **reproduced:** output identity/content matches expected deterministic result;
-- **not reproducible:** a required input or semantic implementation is unavailable;
-- **invalidated:** retained data fails integrity validation;
-- **not applicable:** operation involved nondeterministic AI inference.
+The canonical machine-facing replay-status values are:
 
-AI output may be re-invoked, but that is a new invocation rather than deterministic replay.
+- **`reproduced`** — all required deterministic inputs and semantic implementations are available and replay produces equivalent domain output;
+- **`partially_reproducible`** — a clearly identified deterministic subset can be replayed, but one or more required inputs are unavailable so full output equivalence cannot be established;
+- **`not_reproducible`** — required deterministic inputs or semantic implementations are unavailable and no meaningful deterministic subset sufficient for a replay claim can be completed;
+- **`invalidated`** — retained input/history fails integrity or semantic validation, so replay results cannot be trusted;
+- **`not_applicable`** — deterministic replay does not apply because the operation is nondeterministic by definition, such as an AI/provider inference.
+
+`partially_reproducible` is not a synonym for incomplete evidence metadata. It is valid only when Calathea actually replays and identifies a deterministic subset and records the boundary of what could and could not be reproduced.
+
+Evidence/source availability is a separate RFC 0008 classification. Missing, redacted, deleted, or unavailable evidence may cause `partially_reproducible` or `not_reproducible` depending on whether a meaningful deterministic subset remains replayable.
+
+`invalidated` takes precedence when a required retained input fails integrity or semantic validation; Calathea must not report a replay as reproduced from corrupted or inconsistent history.
+
+AI output may be re-invoked, but that is a new invocation and remains `not_applicable` to deterministic replay rather than partial reproduction.
 
 ## Import and external-source semantics
 
@@ -384,7 +393,7 @@ A redaction record must identify:
 - policy/legal basis where applicable;
 - impact on replay, explanation, and evidence availability.
 
-After redaction, Calathea must not claim full replay or evidentiary completeness if required content is unavailable.
+After redaction, Calathea must not claim full replay or evidentiary completeness if required content is unavailable. Replay status follows the canonical `reproduced` / `partially_reproducible` / `not_reproducible` / `invalidated` / `not_applicable` vocabulary above.
 
 References to redacted content return an explicit redacted state rather than null or not-found ambiguity.
 
@@ -406,7 +415,7 @@ Records that support a current or retained accepted decision should not be physi
 When physical deletion is required:
 
 - retain a tombstone and deletion metadata where legally and operationally permitted;
-- mark dependent explanations and replay as incomplete;
+- mark dependent explanations and replay status explicitly;
 - rebuild projections;
 - avoid identity reuse.
 
@@ -550,7 +559,7 @@ It must not expose physical storage behavior as domain truth. In particular:
 
 - RFC 0006 defines lifecycle states and legal transitions.
 - RFC 0007 defines policy exceptions and override legality.
-- RFC 0008 defines evidence and explanation availability/redaction semantics.
+- RFC 0008 defines evidence and explanation availability/redaction semantics and maps those states into this RFC's replay-status vocabulary.
 - ADR 0002 and the runtime architecture define the persistence boundary consistent with this RFC; physical storage selection remains a later implementation ADR.
 - The MVP roadmap requires backup, restore, replay, and projection-rebuild acceptance tests.
 
@@ -564,6 +573,8 @@ This RFC is accepted because:
 - optimistic concurrency and idempotency are defined;
 - imports preserve external authority and provenance;
 - external changes never rewrite historical decisions;
+- deterministic replay has one canonical machine-facing status vocabulary;
+- partial reproducibility requires an actually replayable deterministic subset and explicit boundary;
 - partial writes and projection failures have deterministic recovery;
 - retention, archival, redaction, deletion, backup, and restore semantics are explicit;
 - required audit history is not silently invalidated;
