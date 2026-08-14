@@ -22,6 +22,7 @@ The Calathea maintainer is the v0 decision authority. Accepted ADRs should link 
 | [0003 — Optional Integration Boundaries and No Anthesis Dependency](0003_optional_integration_boundaries.md) | Accepted | Optional read-only/provider boundaries; no v0 effect/governance port |
 | [0004 — Go Runtime for Calathea v0](0004_go_runtime.md) | Accepted | Go 1.26 line, single local executable, mise task/toolchain entry point |
 | [0005 — Public Go Module and Process Boundary](0005_public_go_process_boundary.md) | Accepted | Public module identity, `internal/` encapsulation, process/schema integration surface |
+| [0006 — SQLite v0 Local Persistence](0006_sqlite_v0_local_persistence.md) | Proposed | Physical local persistence technology/operating model; acceptance gated on #14 spike evidence |
 
 ADR 0005 amends ADR 0004 only where repository/module identity changed during the public-core migration. It does not supersede the Go runtime choice.
 
