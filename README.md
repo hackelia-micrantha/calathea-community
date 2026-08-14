@@ -1,6 +1,6 @@
 # Calathea
 
-> Local-first portfolio orientation for governed human-and-AI planning.
+> AI-assisted project management for technical maintainers — local-first, explainable, and human-authoritative.
 
 [![Last Commit](https://img.shields.io/github/last-commit/hackelia-micrantha/calathea-community)](https://github.com/hackelia-micrantha/calathea-community/commits/main)
 [![Issues](https://img.shields.io/github/issues/hackelia-micrantha/calathea-community)](https://github.com/hackelia-micrantha/calathea-community/issues)
@@ -9,11 +9,141 @@
 
 ## Overview
 
-Calathea helps a technical maintainer decide what to work on now, what should come next, what can wait, and what should be stopped.
+Calathea is an **AI-assisted project-management system** for technical maintainers responsible for more projects and plausible work than available capacity permits.
 
-The product is deliberately local-first and human-authoritative. Its deterministic core converts explicit project evaluations and policy constraints into explainable `now`, `next`, `later`, and `kill` recommendations. AI assistance and external repository signals are optional extensions rather than prerequisites.
+It is intended to help answer the recurring management questions around a software portfolio:
+
+- What should I work on now?
+- What should come next?
+- What can wait?
+- What should I stop investing in?
+- What changed since the last plan or review?
+- Which assumptions, risks, or estimates are becoming stale?
+- Why did a recommendation change, and what evidence supports it?
+
+Calathea combines two deliberately different kinds of machinery:
+
+1. **AI assistance** for evidence synthesis, draft evaluations, observations, findings, explanations, contradiction detection, and other high-context project-management work.
+2. **Deterministic project semantics** for evaluation, policy, prioritization, lifecycle, review, history, and decision traces where reproducibility and authority matter.
+
+The result is AI-assisted project management without making an AI model the system of record or the final decision-maker.
+
+Calathea's initial v0 release is intentionally narrower than the full product direction: it first delivers local portfolio orientation into explainable `now`, `next`, `later`, and `kill` recommendations. Broader planning, review, feedback, lifecycle, evidence, and integration contracts are already represented in the product and RFC model and can build on that foundation.
 
 A `kill` placement is a recommendation to stop investing. It is not an automatic lifecycle transition, deletion, archival action, or repository mutation.
+
+## Product model
+
+Calathea acts as the **decision and review layer** around existing engineering systems rather than trying to replace every execution tool.
+
+```mermaid
+flowchart LR
+    Evidence[Repositories + issues + docs + project evidence]
+    AI[AI-assisted synthesis]
+    Eval[Evaluation + policy]
+    Orient[Prioritize + orient]
+    Human[Maintainer review + disposition]
+    Work[Execution systems]
+    Review[Review + outcomes + calibration]
+
+    Evidence --> AI
+    Evidence --> Eval
+    AI --> Eval
+    Eval --> Orient
+    Orient --> Human
+    Human --> Work
+    Work --> Review
+    Review --> Evidence
+```
+
+Repositories, issue trackers, CI systems, and other project tools can remain authoritative for execution state. Calathea is authoritative for the project-management records it owns: evaluations, policy versions, orientation runs, dispositions, review findings, lifecycle decisions, outcomes, and their history.
+
+## AI-assisted, not AI-authoritative
+
+AI is a first-class assistance surface in the product, but it does not receive hidden authority.
+
+AI may help with:
+
+- summarizing scoped repository, issue, document, and project evidence;
+- drafting evaluation rationale and candidate axis values;
+- identifying missing, stale, or contradictory evidence;
+- drafting observations, findings, and recommendations for review cycles;
+- explaining prioritization and policy traces in useful human language;
+- preparing structured project-management recommendations for maintainer review.
+
+AI output is treated as **untrusted recommendation data**. Structured output is validated before it can influence a workflow, and canonical decisions still pass through explicit maintainer-authorized domain operations.
+
+This separation is intentional:
+
+```text
+untrusted project evidence
+        ↓
+scoped AI assistance
+        ↓
+validated recommendation draft
+        ↓
+deterministic project semantics
+        ↓
+maintainer review / disposition
+        ↓
+canonical Calathea record
+        ↓
+separately authorized external effect, if any
+```
+
+The deterministic core remains usable without an AI provider or network connection. That is a resilience, privacy, testability, and replay property—not a statement that AI is peripheral to the product experience.
+
+See [RFC 0004](docs/rfc_0004_ai_governance_paved_road_and_tooling_policy.md) for the AI interaction boundary and [RFC 0003](docs/rfc_0003_review_feedback_and_learning_semantics.md) for review, feedback, and calibration semantics.
+
+## What Calathea manages
+
+The product model covers several related project-management concerns:
+
+### Portfolio prioritization
+
+- structured evaluation of impact, effort, risk reduction, optionality, urgency, and confidence;
+- deterministic scoring and policy-aware ranking;
+- bounded `now` and `next` queues;
+- explicit `later` and stop-investing recommendations;
+- stable tie-breaking and complete decision traces.
+
+### Planning and lifecycle
+
+- explicit project identity and lifecycle state;
+- versioned policy constraints and exceptions;
+- immutable orientation runs and maintainer dispositions;
+- history that can be compared and replayed rather than silently rewritten.
+
+### Review and feedback
+
+- scheduled, ad-hoc, and evidence-triggered review cycles;
+- observations, findings, recommendations, and dispositions;
+- drift detection across priority, execution, estimates, ownership, narrative, lifecycle, and evidence;
+- outcome and calibration signals that feed later planning without silently changing heuristics.
+
+### Evidence and integrations
+
+- attributable references to repository and project evidence;
+- optional read-only external signals;
+- scoped AI context assembly with explicit outbound data boundaries;
+- integration contracts that keep imported content as data rather than instruction;
+- future effectful operations behind a separate authorization and approval boundary.
+
+## Paved-road philosophy
+
+Calathea should make the safe, inspectable path the easiest path:
+
+- local-first by default;
+- private project data outside source repositories by default;
+- deterministic and replayable decision semantics;
+- AI assistance through versioned, bounded, validated invocation contracts;
+- read-only external integration before write-capable integration;
+- explicit provenance for evidence and recommendations;
+- explicit human disposition before canonical project-management decisions;
+- explicit authorization before external effects;
+- no mandatory hosted account, telemetry, or cloud persistence.
+
+Where used, Invokrum can provide deterministic instruction composition and integrity for AI invocations. Where effectful integrations are later introduced, Anthesis can provide authorization, approval, capability, and effect-governance boundaries. Neither is required for the deterministic Calathea core.
 
 ## Public repository role
 
@@ -30,13 +160,13 @@ See [the repository boundary](docs/architecture/repository-boundary.md) for owne
 
 `calathea-community` owns:
 
-- deterministic domain and orientation logic;
+- deterministic domain, evaluation, policy, orientation, lifecycle, review, and trace semantics;
 - generic application services and application-owned ports;
 - the `calathea` CLI and reusable local persistence implementation as it is added;
 - schemas, migrations, fixtures, golden tests, and conformance tests;
 - the public [PRD](docs/product/prd.md), [use cases](docs/product/use-cases.md), and [MVP roadmap](docs/product/mvp-roadmap.md);
 - [RFCs](docs/rfcs/README.md), [ADRs](docs/adr/README.md), and architecture contracts;
-- public contracts for optional integrations such as Invokrum;
+- public AI/integration contracts, including the Invokrum boundary;
 - generic examples, documentation, CI, and development tooling.
 
 ### Private composition
@@ -68,14 +198,16 @@ The supported process surface and its current stable anchors are defined in the 
 
 ## Product boundary
 
-Calathea's reusable core is designed to remain:
+Calathea is project management, but it is not intended to become an undifferentiated replacement for GitHub Issues, Jira, Linear, CI/CD, source control, or autonomous implementation agents.
+
+Its reusable core is designed to remain:
 
 - local-first and usable without network access;
-- deterministic without requiring AI;
+- deterministic where canonical project semantics require reproducibility;
 - human-approved rather than autonomously authoritative;
 - read-only toward external repositories and project systems by default;
 - independent of hosted accounts, mandatory telemetry, and cloud persistence;
-- independent of Anthesis or another governance platform for core orientation.
+- independent of Anthesis or another governance platform for core planning and orientation.
 
 Future effectful integrations require an explicit authorization/approval boundary. Anthesis may be one such adapter, but its concepts do not belong in the deterministic Calathea core.
 
@@ -83,12 +215,23 @@ Future effectful integrations require an explicit authorization/approval boundar
 
 ```mermaid
 flowchart LR
-    User[Maintainer] --> CLI[Local CLI]
-    CLI --> App[Application Services]
-    App --> Core[Domain + Deterministic Services]
-    App --> Store[(Private Local Store)]
-    App -. optional read .-> Sources[Read-only External Sources]
-    App -. optional invocation .-> AI[AI Provider]
+    User[Maintainer]
+    Surface[CLI / future UI or API]
+    App[Application services]
+    Core[Project-management domain + deterministic services]
+    Store[(Private local store)]
+    Sources[External project sources]
+    AI[AI provider / local model]
+    Effects[Authorized external effects]
+
+    User --> Surface
+    Surface --> App
+    App --> Core
+    App --> Store
+    App -. scoped read .-> Sources
+    App -. scoped invocation .-> AI
+    AI -. validated drafts .-> App
+    App -. separately governed .-> Effects
 ```
 
 Private user data is intentionally separate from the public source repository.
@@ -98,7 +241,7 @@ Private user data is intentionally separate from the public source repository.
 ```mermaid
 flowchart TB
     Private[calathea\nprivate composition + data] --> Public[calathea-community\npublic reusable core]
-    Public --> Domain[Domain + orientation engine]
+    Public --> Domain[Project-management domain]
     Public --> CLI[CLI + application ports]
     Public --> Contracts[PRD + RFCs + ADRs]
     Private --> PrivateData[Portfolio/evidence/config]
@@ -115,16 +258,23 @@ Go is pinned through `mise.toml`. The local quality gate is:
 mise run check
 ```
 
-It verifies formatting, runs `go vet` and `go test ./...`, and builds the `calathea` executable. The core has no third-party Go module dependencies at this stage.
+It verifies formatting, runs static analysis and tests, and builds the `calathea` executable. The broader CI contract adds the repository's pinned quality, security, fuzzing, and process-level checks.
 
 ## Current status
 
-- repository ownership and MPL-2.0 licensing are established;
-- the executable deterministic Go foundation is canonical here after public PR #7 and the coordinated private cleanup;
-- reusable product/RFC/ADR/architecture contracts are canonical here after public PR #8 and the coordinated private cleanup;
-- the public process boundary deliberately avoids exporting a broad Go library API;
-- the CLI/process compatibility contract defines the current supported automation boundary;
-- private portfolio and dogfood data remain outside this repository.
+The public/private split, product contracts, RFC/ADR foundation, process boundary, and deterministic Go foundation are established.
+
+The active MVP path is the UC-01 vertical slice:
+
+1. deterministic policy and orientation engine;
+2. local immutable persistence and rebuildable projections;
+3. project/evaluation/policy setup and orientation/disposition CLI;
+4. comparison, replay, recovery, backup/restore, and privacy behavior;
+5. hardening, packaging, and private dogfood evidence.
+
+Optional structured AI invocation is intentionally downstream of the deterministic MVP critical path, while the product architecture already defines how AI participates safely. This keeps the implementation sequence narrow without reducing Calathea's product identity to a scoring engine.
+
+See the [MVP roadmap](docs/product/mvp-roadmap.md) and issue #11 for the current implementation sequence.
 
 ## Security and privacy
 
@@ -132,10 +282,13 @@ Public Calathea development must preserve these invariants:
 
 - private portfolio data stays outside source checkouts by default;
 - deterministic workflows can run with network access disabled;
-- optional outbound integrations are explicit and scoped;
+- optional outbound integrations are explicit, scoped, and attributable;
 - imported repository content is untrusted data, not executable instruction;
+- AI output is validated recommendation data, not canonical authority;
 - credentials are excluded from project records, prompts, evidence, traces, and model context;
-- failures in optional integrations do not silently mutate canonical state.
+- failures in optional integrations do not silently mutate canonical state;
+- historical decisions remain attributable and are not silently rewritten;
+- effectful external operations require a separate explicit authorization boundary.
 
 ## License
 
