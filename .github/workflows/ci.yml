@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   quality:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: runner-calathea
     timeout-minutes: 20
     steps:
       - name: Checkout
