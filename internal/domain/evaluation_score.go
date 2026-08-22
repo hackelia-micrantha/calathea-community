@@ -37,7 +37,7 @@ func NewAxisAssessment(value int, rationale string) (AxisAssessment, error) {
 	return AxisAssessment{value: score, rationale: rationale}, nil
 }
 
-func (a AxisAssessment) Value() AxisScore   { return a.value }
+func (a AxisAssessment) Value() AxisScore  { return a.value }
 func (a AxisAssessment) Rationale() string { return a.rationale }
 
 // EvaluationAxes is the complete RFC 0001 assessment surface.
