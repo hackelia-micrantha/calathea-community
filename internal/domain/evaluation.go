@@ -26,7 +26,7 @@ func (m FreshnessMetadata) EvidenceAsOf() time.Time { return m.evidenceAsOf }
 type EvaluationDerivation string
 
 const (
-	EvaluationDerivationAuthored      EvaluationDerivation = "authored"
+	EvaluationDerivationAuthored       EvaluationDerivation = "authored"
 	EvaluationDerivationPromotedDraft EvaluationDerivation = "promoted_draft"
 )
 
@@ -58,6 +58,7 @@ type EvaluationVersionInput struct {
 type EvaluationVersion struct {
 	id                     EvaluationVersionID
 	evaluationID           EvaluationID
+	projectID              ProjectID
 	projectVersionID       ProjectVersionID
 	evaluatedAt            time.Time
 	planningHorizon        string
@@ -152,6 +153,7 @@ func NewEvaluationVersion(input EvaluationVersionInput) (EvaluationVersion, erro
 	return EvaluationVersion{
 		id:                     input.ID,
 		evaluationID:           input.Evaluation.ID(),
+		projectID:              input.Evaluation.ProjectID(),
 		projectVersionID:       input.ProjectVersion.ID(),
 		evaluatedAt:            input.EvaluatedAt,
 		planningHorizon:        input.PlanningHorizon,
@@ -171,6 +173,7 @@ func NewEvaluationVersion(input EvaluationVersionInput) (EvaluationVersion, erro
 
 func (v EvaluationVersion) ID() EvaluationVersionID            { return v.id }
 func (v EvaluationVersion) EvaluationID() EvaluationID         { return v.evaluationID }
+func (v EvaluationVersion) ProjectID() ProjectID               { return v.projectID }
 func (v EvaluationVersion) ProjectVersionID() ProjectVersionID { return v.projectVersionID }
 func (v EvaluationVersion) EvaluatedAt() time.Time             { return v.evaluatedAt }
 func (v EvaluationVersion) PlanningHorizon() string            { return v.planningHorizon }
