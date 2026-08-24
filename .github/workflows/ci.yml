@@ -29,28 +29,30 @@ jobs:
           install: true
           cache: true
 
-      - name: Verify mise
-        run: mise --version
+      - name: Verify Nix and mise
+        run: |
+          nix --version
+          nix develop --command mise --version
 
       - name: Verify formatting
-        run: mise run format-check
+        run: nix develop --command mise run format-check
 
       - name: Static analysis
-        run: mise run static
+        run: nix develop --command mise run static
 
       - name: Unit tests and coverage
-        run: mise run test-unit
+        run: nix develop --command mise run test-unit
 
       - name: End-to-end CLI tests
-        run: mise run test-e2e
+        run: nix develop --command mise run test-e2e
 
       - name: Fuzz domain invariants
         env:
           FUZZ_TIME: 20s
-        run: mise run fuzz
+        run: nix develop --command mise run fuzz
 
       - name: Vulnerability analysis
-        run: mise run vuln
+        run: nix develop --command mise run vuln
 
       - name: Build CLI
-        run: mise run build
+        run: nix develop --command mise run build
