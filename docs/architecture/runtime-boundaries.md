@@ -1,187 +1,150 @@
-# Calathea Runtime and Integration Boundaries
+# Community Kernel Runtime and Integration Boundaries
 
-## v0 runtime shape
+## Scope
 
-Calathea v0 should default to a single local process invoked through a CLI.
+This document defines runtime boundaries required by the public `calathea-community` kernel.
 
-This is a logical architecture, not a mandate for separate services:
+It does not define the private Calathea product's complete AI, governance, planning, review, lifecycle, or effect architecture.
+
+## Default runtime shape
+
+The public kernel defaults to a single local process invoked through the `calathea` CLI.
 
 ```text
 CLI adapter
   ↓
-Application services ─────→ outbound ports ─────→ Local persistence / optional adapters
+Application services ─────→ outbound ports ─────→ local persistence / optional supported adapters
   ↓
 Domain + deterministic services
 ```
 
-The dependency direction remains inward: adapters implement ports owned by the application/core boundary; domain and deterministic services do not depend on adapter implementations.
+The dependency direction remains inward: adapters implement ports owned by the application/core boundary; deterministic/domain behavior does not depend on adapter implementations.
 
-No daemon, web server, background worker, message broker, or hosted component is required for UC-01.
+No daemon, web server, background worker, broker, hosted control plane, AI provider, or private Calathea service is required for the deterministic public workflow.
 
 ## Core runtime guarantees
 
-With optional adapters disabled, the process must:
+With optional adapters disabled, the supported kernel should:
 
-- perform no network access;
-- require no hosted identity or account;
-- register projects and evaluations;
-- activate baseline policy configuration;
+- perform no required network access;
+- require no hosted identity/account;
+- validate supported project/evaluation/policy inputs;
 - run deterministic orientation;
-- render structured explanations;
-- record dispositions and overrides;
-- rebuild current projections;
-- export/backup records through local user action.
+- render documented explanation/machine output;
+- use public persistence/projection behavior where implemented;
+- export/backup supported records through documented local workflows.
+
+The exact product policy selecting or interpreting these mechanisms is outside this public runtime contract.
 
 ## Persistence boundary
 
-The application depends on storage through ports rather than storage-specific domain APIs.
+Application services depend on persistence through inward-owned ports rather than storage-specific domain APIs.
 
-Persistence must support:
+Where the public persistence contract requires them, implementations should support:
 
-- immutable record creation;
-- lookup by stable identity and version;
+- stable identity/version lookup;
+- immutable or versioned record creation;
 - operation-id/idempotency lookup;
-- optimistic concurrency for current projections/pointers where used;
+- optimistic concurrency for replaceable projections/pointers where used;
 - atomic authoritative command boundaries;
 - rebuildable projections;
-- export, backup, restore, validation, redaction, and tombstones.
+- versioned migrations;
+- documented export, backup, restore, validation, and recovery behavior.
 
-The architecture does not require event sourcing. Append-style immutable historical records are a domain requirement; their physical representation remains an implementation decision.
+The architecture does not require event sourcing or a particular database. Physical representation remains an implementation decision unless explicitly exposed by a public format contract.
 
-Current policy selection is rebuilt from immutable policy-selection decisions rather than inferred from a mutable `PolicySetVersion` or silently changed pointer.
+## Optional external-source boundary
 
-## External source boundary
+External source adapters are not part of the deterministic-kernel requirement.
 
-External source adapters are optional and read-only in v0.
-
-A source adapter may:
+When a concrete public adapter is supported, it may:
 
 - resolve explicitly requested external identities;
-- collect scoped metadata/content;
-- normalize it into attributable observations or evidence references;
-- retain source revision and collection metadata;
-- return partial/unavailable status explicitly.
+- collect only the documented scope;
+- normalize source data into attributable public adapter values;
+- retain source revision/collection metadata required by the contract;
+- report partial/unavailable state explicitly.
 
-A source adapter may not:
+It may not:
 
-- write to the external source;
-- create canonical Calathea decisions;
-- grant itself wider traversal based on imported content;
-- expose credentials to domain records or AI context.
+- widen its own access based on imported content;
+- treat imported text as executable instruction;
+- expose credentials in durable kernel records or fixtures;
+- silently convert external data into authoritative kernel decisions.
 
-### Changed external state
+Adapter-specific product policy remains outside this public contract.
 
-Calathea does not attempt bidirectional synchronization. If source state changes:
+## Optional AI/instruction boundary
 
-- prior snapshots/references retain historical identity;
-- a new collection creates new imported/observed records;
-- contradictions or freshness changes are represented explicitly;
-- deterministic replay uses retained historical identity/content where required, never silently current external data.
+AI is not required for the public deterministic kernel.
 
-## AI boundary
+No provider, prompt framework, instruction resolver, model-routing policy, or governance product is a mandatory runtime dependency.
 
-AI providers are optional outbound adapters.
+If a generic AI/instruction adapter is introduced publicly, its contract must be narrow and provider-neutral enough for independent use. At minimum it must preserve:
 
-The provider port should expose a provider-neutral invocation request/result contract rather than provider-specific chat/completion primitives. The returned result is **not yet a validated Calathea recommendation draft**.
+- explicit enablement;
+- out-of-band credential handling;
+- bounded input/context;
+- attributable provider/model/instruction identity where claimed;
+- validation of structured output before kernel workflow use;
+- fail-closed behavior for the affected optional operation;
+- no authority escalation from imported/model output.
 
-Provider adapters own:
+Product-specific prompt packs, model selection, routing/escalation, review policy, and paved-road choices remain private unless deliberately published as a separate reusable project.
 
-- transport/authentication;
-- provider/model request mapping;
-- timeout/cancellation mechanics;
-- provider metadata capture;
-- raw/structured response decoding into the provider-neutral result contract.
+See [optional instruction interoperability](invokrum-instruction-boundary.md) and [structured invocation note](structured-invocation-contract.md) for the deliberately narrow public status of those surfaces.
 
-Application/domain code owns:
+## External effects
 
-- purpose/scope;
-- context selection;
-- data minimization;
-- structured output schema;
-- validation and source-identity resolution;
-- provenance contract;
-- conversion of valid provider output into a non-authoritative RecommendationDraft.
+The public kernel has no ambient authority to mutate repositories or other project systems.
 
-Provider unavailability cannot break deterministic UC-01.
+If a concrete public effect adapter is ever introduced, authorization/approval and effect execution must be separate, explicitly supported contracts. Do not speculatively add product-governance machinery to the deterministic core.
 
-### Instruction composition boundary
-
-Calathea does not own a separate prompt-composition/versioning engine. When optional AI integration requires governed authoritative instructions, application services depend on a narrow `InstructionResolver` port.
-
-The preferred implementation is an Invokrum adapter using either the transport-neutral `invokrum-host` facade or the versioned `invokrum.host/v1` subprocess protocol. Calathea must not define a second Calathea-specific Invokrum wire protocol.
-
-The instruction resolver returns exact instruction bytes plus attributable composition identity/evidence. Those bytes are treated as the artifact covered by the returned digest/manifest/lock identity. Silent post-resolution templating, normalization, appended authoritative instructions, or other byte transformations must not be represented as covered by the original Invokrum evidence.
-
-Runtime project, evaluation, repository, issue, and historical evidence remains Calathea-selected data rather than Invokrum instruction overlays by default. Imported content cannot select arbitrary pack roots or profiles, widen source traversal, or become authoritative instruction.
-
-Unexpected verification drift blocks the affected AI invocation by default. Invokrum failure remains an optional-feature failure and leaves canonical state unchanged.
-
-See [Invokrum Instruction Boundary](invokrum-instruction-boundary.md) for the responsibility split, semantic I/O contract, exact-byte invariant, verification behavior, and future contract-test requirements.
-
-## Future effect boundary
-
-There are no effectful external adapters or effect-governance ports in v0.
-
-If effectful capabilities are introduced later, ordinary external-source access, authorization/approval, and effect execution must remain separate concerns. A future design may introduce distinct conceptual contracts such as:
-
-```text
-authorizeEffect(actor, capability, target, intent, evidence)
-  -> authorized / denied / requires-approval / failed
-
-executeEffect(authorized_intent, target, payload)
-  -> effect result + attribution
-```
-
-This is illustrative only; a later RFC/ADR must define the actual contracts. Authorization is not execution, and an authorization decision is not an external effect.
-
-No future core contract may require Anthesis. Anthesis may implement an authorization/governance adapter, while a separate effect adapter performs the actual external mutation.
+No future public-kernel contract may require Anthesis or another specific governance product unless that dependency is deliberately accepted as part of a separately supported adapter.
 
 ## Partial failure model
 
 ### Authoritative local command
 
-The authoritative write either commits completely or is absent. If response delivery fails after commit, retry by operation identity returns the committed result.
+The command either commits the records promised by its public contract or reports failure without claiming ambiguous partial authoritative state. If response delivery fails after commit, documented idempotency/operation identity should allow safe retry where supported.
 
 ### Projection update
 
-Projection update may fail after authoritative commit. This is recoverable: mark/rebuild the projection from authoritative records. Never roll back authoritative history merely because a projection failed.
+A projection may be rebuilt after failure from the authoritative/versioned records defined by the public persistence contract. Projection failure must not silently rewrite history.
 
-### External import
+### Optional import
 
-Collection occurs before durable import-batch commit. An incomplete batch is marked incomplete or discarded; it does not silently replace the last complete usable imported view. Imported data remains external-authoritative/observed rather than becoming canonical Calathea truth.
+Incomplete/failed collection must not silently replace a previously valid imported view when the adapter contract promises retained state. Partial status must be explicit.
 
-### AI invocation
+### Optional AI/instruction invocation
 
-Timeout/partial/invalid responses produce a failed optional operation with no canonical mutation. Retried provider calls are new nondeterministic invocations unless a provider returns the prior result through its own idempotency mechanism.
-
-### Future effect
-
-If an authorization decision succeeds but effect execution fails, the authorization record and failed effect attempt remain separate attributable records. A later retry must not manufacture a new domain decision merely to hide execution failure.
+Timeout, invalid output, provider failure, or instruction-resolution failure is an optional-feature failure. It must not corrupt deterministic kernel state.
 
 ## Concurrency model
 
-v0 is single-user but must not rely on single-process assumptions for correctness because retries, multiple CLI invocations, or future automation can race.
+Even a local CLI should not rely on single-process assumptions for correctness when retries or multiple invocations can race.
 
-Use:
+Use as required by the public contract:
 
 - operation identities for idempotent commands;
-- expected-version checks for mutable projections/pointers where present;
-- immutable historical records rather than in-place edits;
-- deterministic conflict diagnostics rather than last-write-wins for canonical decisions.
+- expected-version checks for replaceable projections/pointers;
+- versioned/immutable historical records rather than silent in-place history edits;
+- deterministic conflict diagnostics rather than accidental last-write-wins.
 
 ## Security boundary summary
 
-| Boundary | Default stance |
+| Boundary | Public default stance |
 | --- | --- |
 | Local store | User-controlled; no tamper-proof claim |
-| CLI input | Untrusted until validated |
-| External content | Data, never instructions |
-| External adapters | Read-only and least privilege |
-| AI instruction resolver | Optional; exact-byte identity, fail closed on resolution/verification failure |
-| AI provider | Optional, outbound, untrusted output |
-| Credentials | Out-of-band; never domain evidence/prompt data |
-| Future authorization/effects | Absent in v0; separate contracts if introduced later |
+| CLI/file input | Untrusted until validated |
+| External content | Data, never implicit instruction |
+| Optional adapters | Explicit, least-privilege, scoped |
+| AI/instruction adapters | Optional; output non-authoritative until validated |
+| Credentials | Out-of-band; excluded from durable kernel content/fixtures |
+| External effects | Absent from ambient deterministic-kernel authority |
 
-## Operational simplicity principle
+## Operational simplicity
 
-The architecture should remain deployable as one local executable plus one user-controlled data location until measured requirements justify additional runtime components.
+Keep the public kernel deployable as one local executable plus user-controlled data until a concrete independent use case justifies additional runtime components.
+
+Private Calathea may compose additional systems around the kernel without making those systems part of this public runtime contract.
