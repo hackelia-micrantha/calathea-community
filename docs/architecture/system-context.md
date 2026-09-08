@@ -1,158 +1,144 @@
-# Calathea System Context
+# Community Kernel System Context
 
 ## Status
 
-Architecture baseline for v0 planning.
+Architecture baseline for the public reusable kernel.
+
+This is not the complete private Calathea product/system context.
 
 ## Architectural intent
 
-Calathea is a privacy-preserving, local-first portfolio-orientation application. The v0 core must run without network access, AI, GitHub, Anthesis, or any other hosted dependency.
+`calathea-community` is a local-first deterministic kernel exposed primarily through a CLI/process/file boundary.
+
+The default public workflow must run without the private Calathea repository, a hosted service, AI provider, governance platform, or mandatory network access.
 
 The architecture follows one dependency rule:
 
-> Domain and application behavior depend only on stable inward-owned contracts. CLI, storage, repositories, and AI providers are replaceable adapters.
+> Domain/deterministic behavior depends only on stable inward-owned contracts; CLI, persistence, and optional adapters remain replaceable outer concerns.
 
 ## System context
 
 ```mermaid
 flowchart LR
-    U[Maintainer]
-    C[Calathea CLI]
-    A[Calathea Application Core]
-    S[(Private Local Store)]
-    G[Optional Read-only Source\nGitHub / files / future adapters]
-    AI[Optional AI Provider]
+    U[Community user / caller]
+    C[calathea CLI]
+    A[Kernel application services]
+    D[Deterministic/domain core]
+    S[(User-controlled local store)]
+    O[Optional supported adapters]
 
     U --> C
     C --> A
+    A --> D
     A --> S
-    A -. optional read .-> G
-    A -. optional invocation .-> AI
+    A -. optional .-> O
 ```
 
-UC-01 has no governance-system dependency. Future effectful capabilities require a separate architecture decision and are not part of this v0 context.
+The private Calathea product may compose additional project-management, AI, review, lifecycle, or governed-effect workflows around this kernel. Those are outside this public context unless a concrete public adapter is separately supported.
 
 ## Trust boundaries
 
-### Maintainer boundary
+### Caller/input boundary
 
-The maintainer is the only v0 actor with authority to create canonical Calathea decisions. Local process identity is not sufficient by itself to infer domain authority; application commands must identify the actor context used for canonical mutations.
+CLI/file/process inputs are untrusted until validated against the supported public contract.
+
+The kernel may derive recommendations/results, but caller/product authority is not inferred merely from deterministic output.
 
 ### Local persistence boundary
 
-The local store contains Calathea-authoritative records and rebuildable projections. It is trusted for ordinary local operation but is not assumed to be tamper-proof against a fully compromised host or administrator.
+The local store is user-controlled. Public persistence behavior may promise versioned/immutable records and rebuildable views, but the kernel does not claim tamper-proof storage against a compromised host/administrator unless a separate mechanism explicitly provides that guarantee.
 
-### External-source boundary
+### Optional adapter boundary
 
-Repository, issue, CI, document, and other imported content is external-authoritative and untrusted as instruction. Adapters are read-only in v0. Imported content cannot widen scope, grant authority, or mutate canonical Calathea state directly.
+Any public external-source, AI, instruction, or other adapter is optional and must be explicitly supported.
 
-### AI-provider boundary
+Adapter input/output remains subject to the contract's validation and provenance rules. Imported external content is data, not instruction, and cannot silently widen adapter scope or grant authority.
 
-AI is optional. Model input is explicitly selected and minimized. Provider output is untrusted candidate data; application/domain validation must succeed before a RecommendationDraft is created for maintainer review.
+### External effects
 
-### Future authorization/effect boundary
+The deterministic kernel has no ambient authority to mutate external repositories/project systems.
 
-No authorization or effect adapter exists in v0. If Calathea later gains external write capabilities, authorization/approval and effect execution must remain separate boundaries. Anthesis may implement a future governance adapter, but Calathea must not depend on Anthesis-specific concepts.
+If a future public effect adapter exists, its authorization and execution boundaries require a separate explicit contract rather than being inferred from ordinary kernel recommendation behavior.
 
-## Source-of-truth matrix
+## Public source-of-truth matrix
 
-| Information | Authoritative system | Calathea representation | v0 mutation authority |
-| --- | --- | --- | --- |
-| Portfolio/project metadata authored in Calathea | Calathea | Canonical immutable versions + current projections | Maintainer |
-| Evaluation versions | Calathea | Canonical immutable versions | Maintainer |
-| Policy-set versions | Calathea | Canonical immutable versions | Maintainer |
-| Policy selection | Calathea | Immutable policy-selection decision + rebuildable current-policy projection | Maintainer |
-| Orientation runs | Calathea deterministic core | Immutable recommended records | Deterministic core creates; maintainer cannot rewrite |
-| Orientation dispositions/overrides | Calathea | Canonical immutable decisions | Maintainer |
-| Current accepted orientation | Calathea | Rebuildable projection | Derived only |
-| Lifecycle decisions | Calathea | Canonical immutable decisions | Maintainer |
-| GitHub issues/PRs/CI | GitHub | Imported snapshot/reference | GitHub externally; Calathea read-only |
-| Files/documents | External source | Reference/snapshot where permitted | External system |
-| AI provider output | AI provider | Invocation result/provenance; RecommendationDraft only after Calathea validation | Non-authoritative |
-| External effects | External systems | Not present in v0 | Not present in v0 |
+Only information represented by supported public formats/process behavior belongs in this matrix.
 
-## v0 container view
+| Information | Authority | Public-kernel role |
+| --- | --- | --- |
+| Caller-authored supported project/evaluation/policy input | Caller/user | Validate/store/version as documented |
+| Deterministic orientation result | Kernel derivation | Reproducible recommended/derived output |
+| Supported dispositions/overrides, if implemented | Caller/user | Persist/version according to public contract |
+| Current projections, if implemented | Derived | Rebuildable from supported authoritative/versioned records |
+| External adapter data, if implemented | External source | Attributable imported data only |
+| AI/provider output, if a public adapter is implemented | Provider/runtime | Untrusted output until validated |
+| External repository/project-system effects | External system | Outside ambient deterministic-kernel authority |
+
+The private product owns broader canonicality rules for planning, review, lifecycle, milestones, stakeholders, and dogfood.
+
+## Default container view
 
 ```mermaid
 flowchart TB
-    subgraph Process[Single local Calathea process]
+    subgraph Process[Single local community-kernel process]
       CLI[CLI Adapter]
       APP[Application Services]
-      DOMAIN[Domain Model + Deterministic Services]
-      PORTS[Application-owned Outbound Ports]
+      CORE[Domain + Deterministic Services]
+      PORTS[Application-owned Ports]
       PERSIST[Local Persistence Adapter]
-      PROJ[Projection Builder]
-      SRC[Optional Read-only Source Adapters]
-      AIA[Optional AI Adapter]
+      OPT[Optional Supported Adapters]
 
       CLI --> APP
-      APP --> DOMAIN
+      APP --> CORE
       APP --> PORTS
       PERSIST --> PORTS
-      SRC --> PORTS
-      AIA --> PORTS
-      APP --> PROJ
-      PROJ --> PORTS
+      OPT --> PORTS
     end
 
     DB[(User-controlled local data)]
-    EXT[(External read-only systems)]
-    MODEL[(Optional AI provider)]
+    EXT[(Optional external systems)]
 
     PERSIST --> DB
-    SRC --> EXT
-    AIA --> MODEL
+    OPT --> EXT
 ```
 
-Arrows to `PORTS` in the container view show dependency on inward-owned interfaces, not runtime data-flow direction. Logical components do not imply separate processes or services. The v0 default should remain one local executable/process unless evidence justifies otherwise.
+Logical components do not imply separate services/processes. Keep one local executable/process until a concrete public requirement justifies additional runtime components.
 
-## Primary UC-01 flow
+## Deterministic flow
 
 ```mermaid
 sequenceDiagram
-    actor U as Maintainer
+    actor U as Caller
     participant CLI
     participant APP as Application
-    participant D as Domain
-    participant R as RecordStore Port
-    participant P as Projection Builder
+    participant D as Deterministic Core
+    participant R as Public persistence port
 
-    U->>CLI: register/evaluate projects
-    CLI->>APP: commands
-    APP->>D: validate/create canonical versions
-    APP->>R: append immutable records
-
-    U->>CLI: orient portfolio
-    CLI->>APP: run orientation
-    APP->>R: load exact versions
-    APP->>D: deterministic orientation
-    D-->>APP: OrientationRun + trace
-    APP->>R: persist immutable run
-    APP-->>CLI: recommendations/explanation
-
-    U->>CLI: accept / override / reject / defer
-    CLI->>APP: disposition command
-    APP->>D: validate domain/policy rules using actor context
-    APP->>R: persist immutable disposition
-    APP->>P: rebuild affected projection
-    P-->>CLI: current accepted orientation
+    U->>CLI: provide supported inputs
+    CLI->>APP: command/query
+    APP->>D: validate + derive
+    D-->>APP: deterministic result + trace
+    APP->>R: persist supported records if requested/implemented
+    APP-->>CLI: documented output / exit semantics
 ```
+
+Product-level acceptance, planning, review, lifecycle transition, or external effect is not implied by this kernel flow.
 
 ## Failure boundaries
 
-- Adapter/network failure cannot corrupt canonical state.
-- External imports are staged and attributable; incomplete imports do not silently replace prior usable observations.
-- Canonical command persistence is all-or-nothing per command boundary.
-- Lost responses use operation identity/idempotency to return an already committed result.
-- Projection failure does not invalidate authoritative history; projections are rebuildable.
-- AI failure is an optional-feature failure only and cannot block deterministic core behavior unnecessarily.
+- invalid input fails explicitly;
+- a failed optional adapter cannot silently corrupt deterministic kernel state;
+- authoritative/versioned public writes use documented atomic/idempotent behavior where promised;
+- projection failure is recoverable when projections are specified as rebuildable;
+- missing optional network/provider capability does not break offline deterministic operation;
+- unsupported semantic/file/process versions fail rather than being silently reinterpreted.
 
 ## Non-goals
 
-- Distributed services or microservices.
-- Mandatory daemon/server runtime.
-- Hosted database or control plane.
-- Bidirectional repository synchronization.
-- Generic plugin marketplace.
-- Anthesis integration in v0.
-- Effectful repository/project-management adapters.
+- complete private Calathea product architecture;
+- mandatory daemon/server runtime;
+- hosted database/control plane;
+- mandatory AI/instruction/governance dependency;
+- bidirectional repository synchronization by default;
+- generic plugin marketplace;
+- speculative effect/governance architecture without a concrete public adapter.
