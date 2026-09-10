@@ -21,7 +21,7 @@ A private Calathea product requirement may motivate a public ADR, but the ADR sh
 | --- | --- | --- |
 | [0001 — Dependency Direction and Core Isolation](0001_dependency_direction.md) | Accepted | Inward dependency direction; public deterministic/core isolation |
 | [0002 — Local Persistence, Immutable History, and Rebuildable Projections](0002_local_persistence_and_history.md) | Accepted | Public local persistence architecture required by supported kernel behavior |
-| [0003 — Optional Integration Boundaries and No Anthesis Dependency](0003_optional_integration_boundaries.md) | Accepted / audit pending | Public optional-adapter architecture; issue #48 will remove any private-product strategy that is not required here |
+| [0003 — Optional Adapter Boundaries](0003_optional_integration_boundaries.md) | Accepted | Generic optional-adapter architecture; no mandatory provider/governance/effect dependency |
 | [0004 — Go Runtime for Calathea v0](0004_go_runtime.md) | Accepted | Go runtime and single local executable for this public implementation |
 | [0005 — Public Go Module and Process Boundary](0005_public_go_process_boundary.md) | Accepted | Public module identity, `internal/` encapsulation, process/schema integration surface |
 
