@@ -14,8 +14,6 @@
         default = pkgs.mkShell {
           packages = with pkgs; [
             mise
-            staticcheck
-            govulncheck
           ];
 
           shellHook = ''
