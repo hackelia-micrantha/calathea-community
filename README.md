@@ -115,7 +115,7 @@ Public RFCs own durable **kernel behavior and compatibility**, not the complete 
 
 Public ADRs own implementation decisions for this repository and its exposed surfaces.
 
-Existing RFC 0000–0008 are being classified and narrowed under issue #48. Historical text remains available in git history; current-head documentation should converge on the minimum public contract.
+RFC 0000–0008 were narrowed under issue #48 to kernel compatibility, safety, and extension contracts. Historical broader text remains available in git history; current-head documentation defines the minimum public contract.
 
 See [RFC governance](docs/rfcs/README.md) and [ADR governance](docs/adr/README.md).
 
