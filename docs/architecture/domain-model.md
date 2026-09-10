@@ -1,179 +1,124 @@
-# Calathea Domain Model Architecture
+# Community Kernel Domain Architecture
 
 ## Purpose
 
-This document maps accepted domain semantics into implementation-facing logical boundaries. It does not replace RFC 0000; it shows where those concepts live and how dependencies flow.
+This document maps the domain concepts required by the supported public kernel into implementation-facing boundaries.
 
-## Logical components
+It is **not** the complete Calathea product domain model. Product-level planning, review, lifecycle, milestone, archival, stakeholder, and AI workflow semantics are owned by the private `hackelia-micrantha/calathea` repository unless a concrete public compatibility surface requires a subset here.
 
-### Domain model
+## Public kernel components
 
-Owns value objects, entities, invariants, and pure validation for:
+### Core value/entity model
 
-- Portfolio and Project identity;
-- Evaluation and EvaluationVersion;
-- PolicySet, PolicySetVersion, PolicyException, and policy-selection decisions;
-- OrientationRun and PlacementRecommendation;
-- OrientationDisposition and PlacementOverride;
-- LifecycleDecision;
-- evidence/trace value contracts used by deterministic behavior.
+The public kernel may own versioned types and invariants required by its supported orientation/persistence surfaces, including:
 
-The domain layer does not depend on persistence, CLI, network, GitHub, AI providers, or governance systems.
+- project identity and the minimum project metadata required by public schemas;
+- evaluation values/versions required by deterministic evaluation;
+- policy/evaluator inputs required by the supported orientation contract;
+- orientation run and placement recommendation;
+- disposition/override records only where they are part of the supported public persistence/process surface;
+- evidence/trace values required to explain public deterministic behavior.
+
+A type is not public merely because the private product uses it. It belongs here only when public process/file/schema behavior depends on it.
 
 ### Deterministic services
 
-Own pure or deterministic derivation that spans domain records:
+Own pure or deterministic derivation exposed by the kernel, such as:
 
-- evaluation score calculation;
-- policy evaluation;
-- policy-exception applicability/application validation;
-- orientation candidate selection;
-- tie-breaking;
-- explanation/trace generation;
-- replay validation;
-- current-orientation derivation inputs.
+- evaluation calculation;
+- supported policy/evaluator application;
+- candidate eligibility/exclusion;
+- bounded queue selection;
+- stable tie-breaking;
+- public explanation/trace generation;
+- replay validation where promised.
 
-These services consume exact versioned inputs and produce immutable outputs.
+These services consume exact versioned inputs and produce reproducible outputs for the public contract.
 
 ### Application services
 
-Coordinate commands and queries:
+Coordinate supported commands and queries without becoming domain truth.
 
-- register/update project metadata by creating new immutable versions;
-- accept evaluation drafts into EvaluationVersion records;
-- create/activate policy-set versions and record policy selection;
-- create/revoke/supersede scoped PolicyException records without mutating prior exceptions;
-- run orientation;
-- create orientation dispositions and overrides, validating any required PolicyException and retaining PolicyExceptionApplication trace records;
+Examples may include:
+
+- validate/register the minimum public project representation;
+- record supported evaluation versions;
+- execute deterministic orientation;
+- persist supported immutable/versioned records;
+- record supported dispositions if part of the public workflow;
 - rebuild projections;
-- import optional read-only observations;
-- invoke optional AI assistance through a provider port and validate the returned candidate output separately.
+- expose machine-readable queries/exports.
 
-Application services own transaction/command boundaries and idempotency orchestration, not domain truth.
+Product-specific orchestration should not be added here simply to mirror the private product.
 
 ### Ports
 
-Stable interfaces required by application services. Initial conceptual ports:
+Application-owned ports exist only for concrete public needs. Typical examples:
 
-- `RecordStore` — append/load immutable canonical, recommended, and imported records;
-- `ProjectionStore` — load/update rebuildable current views;
-- `Clock` — explicit application time source where semantics need time;
-- `IdentityGenerator` — stable operation/record identity generation;
-- `ReadOnlySource` — optional external observation/import interface;
-- `AIProvider` — optional provider-invocation interface returning non-authoritative output plus provider provenance.
+- `RecordStore` — load/append supported records;
+- `ProjectionStore` — load/update rebuildable public views;
+- `Clock` — explicit time source when public semantics require time;
+- `IdentityGenerator` — stable operation/record identity;
+- optional adapters only after a supported public contract exists.
 
-Domain validation of AI output occurs after the provider call and is not delegated to the provider adapter.
+Do not add speculative provider, governance, plugin, or effect ports merely because the private product may eventually need them.
 
-There is **no effect-governance or effect-execution port in v0**. If effectful capabilities are introduced later, their authorization/approval boundary and their execution boundary must be designed separately through a new RFC/ADR rather than added speculatively here.
+## Public state categories
 
-The exact language-level interfaces are deferred to implementation planning.
+The kernel should distinguish the dimensions needed by its persisted/process contracts rather than publish the complete private product state taxonomy.
 
-## Entity-to-component mapping
+### Authoritative/versioned records
 
-| Entity/concept | Primary owner | v0 required? | Notes |
-| --- | --- | --- | --- |
-| Portfolio | Domain + persistence | Yes | Stable identity and membership |
-| Project / ProjectVersion | Domain + persistence | Yes | Repository-independent |
-| Evaluation / EvaluationVersion | Domain + deterministic scoring | Yes | Accepted versions canonical |
-| EvaluationDraft | Application/domain | Minimal | Manual draft sufficient; AI optional |
-| PolicySet / PolicySetVersion | Domain + policy service | Yes | Baseline built-in policies |
-| Policy selection decision | Domain + application | Yes | Immutable maintainer selection of one PolicySetVersion |
-| PolicyDecision | Policy service / trace | Yes | Part of OrientationRun trace |
-| PolicyException | Domain + application | Yes | Required so legal accepted-with-overrides can deviate from exceptionable hard policy when explicitly authorized |
-| PolicyExceptionApplication | Deterministic policy service / trace | Yes | Immutable use/application record; enforces scope, expiry, revocation, and maximum-use without mutating the exception |
-| OrientationRun | Orientation service | Yes | Immutable deterministic recommendation |
-| PlacementRecommendation | OrientationRun | Yes | now/next/later/kill |
-| OrientationDisposition | Domain + application | Yes | Maintainer-authored canonical decision |
-| PlacementOverride | Disposition | Yes | Explicit rationale; exception ref required only when needed to deviate from an exceptionable hard policy |
-| CurrentAcceptedOrientation | Projection | Yes | Rebuildable view |
-| LifecycleDecision | Domain + application | Minimal | Needed to preserve lifecycle/orientation separation |
-| EvidenceReference / TraceEntry | Domain contract + services | Yes | Structured explanation |
-| ReviewCycle / Finding | Review extension | No for first UC-01 slice | Architecture reserves boundary |
-| AIInvocation / RecommendationDraft | Application + optional adapter provenance | No | Provider output remains non-authoritative; application validates drafts |
-| ExternalSource / SourceReference | Optional adapter | No | Read-only when introduced |
-| WorkItem | External/reference only | No | No task tracker in v0 |
+Records whose public format/behavior is part of the supported kernel contract.
 
-An immutable policy-selection decision is the minimal supporting record required if the current policy selection is implemented as a rebuildable projection. It records the selected immutable `PolicySetVersion`, actor/authority, time, operation identity, and supersession relationship.
+Examples can include exact project/evaluation/policy versions or caller-authored dispositions when implemented by the public persistence surface.
 
-Policy-exception support is part of the v0 semantic model even if the baseline policy set does not exercise it in every run. The system must not advertise `accepted_with_overrides` while lacking the records needed to validate a hard-policy deviation.
+### Deterministically derived records
 
-## State classes in architecture
+Examples include orientation runs, placement results, policy/evaluator diagnostics, and trace data produced from exact versioned inputs.
 
-RFC 0000 defines authority, derivation, and durability as independent dimensions. Architecture maps those to storage behavior rather than a single state enum.
+Derived output does not silently gain caller authority merely because it is deterministic.
 
-### Canonical immutable records
+### Imported/optional adapter data
 
-Examples:
-
-- ProjectVersion;
-- EvaluationVersion;
-- PolicySetVersion;
-- policy-selection decisions;
-- PolicyException and its revocation/supersession decisions;
-- OrientationDisposition;
-- LifecycleDecision.
-
-Created only through maintainer-authorized application commands.
-
-### Recommended/deterministic immutable records
-
-Examples:
-
-- OrientationRun;
-- PolicyExceptionApplication;
-- retained RecommendationDraft.
-
-These records never gain maintainer authority by in-place promotion. `PolicyExceptionApplication` records that an already-authorized exception was validly applied; it does not create the exception itself.
-
-### Imported/observed records
-
-External-authoritative material is normalized or referenced without transferring authority. Imported records are immutable snapshots when retained; freshness is a derived assessment.
+If a public adapter is introduced, external data remains attributable and untrusted. It does not silently become authoritative kernel state.
 
 ### Projections
 
-Examples:
+Replaceable current views may be used when they are rebuildable from the authoritative/versioned records defined by the public persistence contract.
 
-- current project version;
-- current lifecycle state;
-- current policy-set selection derived from immutable policy-selection decisions;
-- current accepted orientation;
-- exception-use counts and effective exception validity views.
+## Command consistency
 
-Projections may be mutated/replaced because they are rebuildable from authoritative/immutable records.
+A supported authoritative command should either commit its promised records completely or leave no ambiguous partial authoritative result.
 
-## Candidate consistency boundaries
+Projection failure after authoritative commit is recoverable and must not cause silent history rewrite.
 
-Architecture intentionally avoids committing to DDD aggregates before storage and transaction semantics are implemented. The minimum command boundaries are:
-
-1. create one immutable authored version/decision;
-2. create/revoke/supersede one scoped PolicyException through immutable records;
-3. create one complete immutable OrientationRun;
-4. create one complete OrientationDisposition together with deterministic validation/application records required to establish its legality;
-5. create one immutable policy-selection decision referencing an exact PolicySetVersion, then rebuild/update its current projection;
-6. stage/commit one retained external import batch where imports are enabled.
-
-A command either commits its authoritative records completely or leaves no authoritative partial result. Projection failure after authoritative commit is recoverable and must not roll back history.
+The exact storage technology is an implementation decision unless exposed by a public compatibility contract.
 
 ## Dependency direction
 
 ```mermaid
 flowchart LR
-    Adapters[CLI / Persistence / Source / AI adapters]
-    App[Application Services]
-    Domain[Domain + Deterministic Services]
+    Adapters[CLI / persistence / optional supported adapters]
+    App[Application services]
+    Core[Public domain + deterministic services]
 
     Adapters --> App
-    App --> Domain
+    App --> Core
 ```
 
-Outbound ports needed by application services are owned inward and implemented by adapters. Domain/deterministic code does not depend on storage, provider, source, or effect ports merely to remain framework-independent.
+Outbound interfaces needed by application services are owned inward and implemented by adapters. Core deterministic code should not depend directly on storage/provider implementations.
 
-## Governance independence
+## Boundary with private product
 
-No Calathea domain entity references Anthesis.
+The private Calathea product may define richer concepts such as review cycles, findings, lifecycle decisions, milestones, archival policy, stakeholder workflows, structured AI invocations, or governed effects.
 
-There is no governance adapter in the v0 architecture. If effectful capabilities are introduced later, a new RFC/ADR must preserve the existing distinction between authorization/approval and effect execution. Anthesis may implement a future authorization/governance adapter, but that decision must not introduce Anthesis-specific domain concepts or make read-only Calathea behavior depend on Anthesis.
+Those concepts enter this public architecture only when a concrete public CLI/file/schema/extension surface requires a stable interoperable representation or behavior.
+
+When that happens, extract the minimum public contract rather than copying the complete private product model.
 
 ## Evolution rule
 
-A future feature should become a new core entity or service only if it carries durable Calathea-specific semantics. Provider-specific or infrastructure-specific behavior stays in adapters.
+Before adding a public entity/service/port, identify the supported public behavior that requires it.
+
+If the justification is only "Calathea product uses this internally," keep it private until an independent public compatibility need exists.

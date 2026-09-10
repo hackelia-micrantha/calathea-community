@@ -1,80 +1,116 @@
-# Calathea RFC Governance
+# Calathea Community Kernel RFC Governance
 
-This directory defines the lifecycle and authoritative index for Calathea RFCs. RFC files remain at `docs/rfc_*.md` for stable links.
+## Authority
+
+Public RFCs in this repository define durable **kernel behavior, compatibility, safety, or extension contracts**.
+
+They do not own the complete Calathea product strategy, roadmap, planning/review/lifecycle policy, prioritization philosophy, calibration, AI paved road, dogfood, or private operating assumptions. Those are private product decisions in `hackelia-micrantha/calathea`.
+
+## Publication test
+
+Before adding or expanding a public RFC, ask:
+
+> Must an independent community consumer or implementation know this decision for compatibility, safety, contribution, useful standalone operation, or an intentionally supported extension surface?
+
+- **Yes:** document the minimum generic public contract here.
+- **No:** keep the decision private.
+- **Mixed:** split the concern; public owns interface/behavior/versioning, private owns product rationale/policy/defaults/calibration.
+
+"Reusable" alone is not sufficient reason to publish the full product decision.
 
 ## Status model
 
-- **Proposed** — under review; not yet authoritative.
-- **Accepted** — authoritative semantic decision.
-- **Superseded** — replaced by a named later RFC; retained for history.
-- **Rejected** — considered but deliberately not adopted.
+- **Proposed** — under review; not yet a public compatibility commitment.
+- **Accepted** — authoritative for the stated public-kernel scope.
+- **Deferred** — no current standalone/public surface requires the broader behavior; retained as a boundary marker.
+- **Superseded** — replaced by a named later public contract; retained for history.
+- **Rejected** — considered but not adopted.
 
-The Calathea maintainer is the v0 decision authority.
+Material compatibility changes use an amendment or superseding RFC rather than silently changing supported behavior.
 
 ## Current RFC index
 
-| RFC | Status | Scope |
-| --- | --- | --- |
-| [0000 — Conceptual Domain Model and Canonical Terminology](../rfc_0000_conceptual_domain_model.md) | Accepted | Foundational entities, authority, terminology, identity/versioning |
-| [0001 — Evaluation Semantics](../rfc_0001_evaluation_orientation_semantics.md) | Accepted | Evaluation axes, scoring, confidence, freshness inputs, calibration |
-| [0002 — Orientation Engine Semantics](../rfc_0002_orientation_engine_policy_semantics.md) | Accepted | Deterministic orientation, queue selection, tie-breaking, diagnostics |
-| [0003 — Review, Feedback, and Calibration Semantics](../rfc_0003_review_feedback_and_learning_semantics.md) | Accepted | Reviews, findings, recommendations, dispositions, calibration signals |
-| [0004 — AI Interaction and Governance Boundary](../rfc_0004_ai_governance_paved_road_and_tooling_policy.md) | Accepted | Optional AI, context/output validation, authority/governance boundary |
-| [0005 — State, History, and Source-of-Truth Semantics](../rfc_0005_state_history_and_source_of_truth.md) | Accepted | Authority, immutable history, concurrency, replay, retention/recovery |
-| [0006 — Project Lifecycle and Legal Transitions](../rfc_0006_project_lifecycle_and_transitions.md) | Accepted | Lifecycle states, transitions, outcomes, correction/recovery |
-| [0007 — Policy Model, Composition, and Decision Semantics](../rfc_0007_policy_model_and_decision_semantics.md) | Accepted | Versioned policies, deterministic evaluators, composition, exceptions |
-| [0008 — Evidence, Explanation, Provenance, and Trace Semantics](../rfc_0008_evidence_explanation_and_trace_semantics.md) | Accepted | Cross-cutting evidence/provenance/trace/redaction/replay contracts |
+RFC 0000–0008 were originally promoted under a broader public-product ownership model. Issue #48 narrows those files in place so historical links remain valid while current head exposes only the community-kernel contract.
 
-The inline status in each RFC is synchronized with this index as part of the public-core migration.
+| RFC | Status | Current public scope |
+| --- | --- | --- |
+| [0000 — Community Kernel Record and Identity Model](../rfc_0000_conceptual_domain_model.md) | Accepted | Record identity/versioning/state distinctions needed by supported public process/file/schema behavior |
+| [0001 — Deterministic Evaluation Contract](../rfc_0001_evaluation_orientation_semantics.md) | Accepted | Deterministic evaluation inputs/outputs/versioning; excludes private calibration and strategic interpretation |
+| [0002 — Deterministic Orientation Contract](../rfc_0002_orientation_engine_policy_semantics.md) | Accepted | Deterministic placement/ordering/capacity/diagnostic behavior exposed by the kernel |
+| [0003 — Public Review Extension Boundary](../rfc_0003_review_feedback_and_learning_semantics.md) | Deferred | Boundary for future concrete public review state; complete review/learning strategy is private |
+| [0004 — Optional AI Adapter Safety Contract](../rfc_0004_ai_governance_paved_road_and_tooling_policy.md) | Accepted | Validation, non-authority, data/safety and adapter compatibility constraints only |
+| [0005 — Public State, History, Replay, and Persistence Invariants](../rfc_0005_state_history_and_source_of_truth.md) | Accepted | Persisted/history/replay guarantees required by supported public formats |
+| [0006 — Lifecycle Compatibility Boundary](../rfc_0006_project_lifecycle_and_transitions.md) | Deferred | Separation of orientation from lifecycle plus any explicitly exposed lifecycle serialization/transition behavior |
+| [0007 — Policy Evaluation and Composition Compatibility](../rfc_0007_policy_model_and_decision_semantics.md) | Accepted | Evaluator identity/versioning, deterministic composition, result classes, validation and trace compatibility |
+| [0008 — Evidence, Provenance, and Trace Compatibility](../rfc_0008_evidence_explanation_and_trace_semantics.md) | Accepted | Evidence/source identity, provenance, trace/reason-code, redaction and replay compatibility |
+
+The complete product counterparts are private and may be broader than these public contracts.
 
 ## RFC rules
 
-1. RFCs own durable product/domain semantics, not incidental implementation structure.
-2. Accepted RFC history is not silently rewritten. Material changes use an amendment with explicit rationale or a superseding RFC.
-3. Corrections that do not alter semantics may be made in place when the change and provenance remain clear.
-4. An RFC must distinguish recommendation, human decision, canonical mutation, authorization, and external effect where relevant.
-5. Security, privacy, failure/recovery, compatibility, and validation implications must be explicit.
-6. Unresolved questions must identify a later RFC/ADR/issue or the concrete condition that would justify reopening the decision.
-7. Implementation-specific choices belong in ADRs when they do not change RFC semantics.
+1. RFCs own durable public-kernel semantics, not incidental implementation structure or complete product strategy.
+2. State the externally observable/publicly relied-on behavior the RFC protects.
+3. Distinguish public mechanism from private product policy/defaults/calibration.
+4. Compatibility, migration, validation, failure/recovery, security, and privacy implications must be explicit.
+5. Accepted compatibility history is not silently rewritten.
+6. Internal implementation choices belong in ADRs when they do not alter a public contract.
+7. If no external/public contract is affected, prefer an ADR, issue, test, or private product RFC rather than broadening this RFC surface.
 
 ## Traceability
 
-Reusable-core work should preserve:
+Public implementation work should preserve:
 
 ```text
-PRD → use case → RFC / ADR → public issue → PR → validation evidence
+public kernel use case / concrete compatibility need
+        ↓
+public RFC or ADR when durable
+        ↓
+issue
+        ↓
+PR
+        ↓
+synthetic validation / compatibility evidence
 ```
 
-The RFCs were originally accepted while implementation planning lived in a private-first repository. Historical bare issue numbers in earlier revisions are provenance only; they are not normative public dependencies. During migration, semantic delegations were converted to the RFC/ADR that actually owns the decision.
+When work originates from private Calathea:
 
-New reusable implementation work belongs in `calathea-community` issues and PRs. Private dogfood/data/configuration work remains in the private composition repository.
+```text
+private product requirement
+        ↓
+minimum extracted public contract
+        ↓
+public issue / RFC-or-ADR / PR / validation
+        ↓
+private reviewed public-core pin
+        ↓
+private dogfood / product review
+```
 
 ## Amendment and supersession
 
-A material RFC change must state:
+A material public RFC change must state:
 
-- which accepted requirement changed;
-- why the previous decision is no longer sufficient;
-- migration and compatibility consequences;
+- which supported public behavior changes;
+- why the previous contract is insufficient;
+- migration/compatibility consequences;
 - security/privacy implications;
-- validation needed before adoption;
+- validation required before adoption;
 - whether the prior RFC is amended or superseded.
 
-Superseded RFCs remain in the repository and point to their replacement.
+Superseded RFCs remain available for history.
 
-## Deferred boundaries
+## Public non-goals
 
-The accepted v0 semantics deliberately defer:
+Do not use public RFCs to speculatively define:
 
-- AI as a requirement for deterministic orientation;
-- autonomous external effects;
-- generic plugin or arbitrary policy DSL support;
-- multi-user collaboration and hosted control-plane concerns;
+- complete private planning/review/lifecycle strategy;
+- private AI model routing or prompt/profile policy;
 - automatic policy/weight/heuristic learning;
-- bidirectional external synchronization.
-
-Future work in those areas requires explicit product pressure and a new or amended RFC/ADR rather than accidental expansion through implementation.
+- a generic plugin marketplace or unrestricted policy DSL;
+- private stakeholder/maintenance strategy;
+- hosted control-plane/product strategy;
+- dogfood-derived defaults without a deliberate publication decision.
 
 ## Template
 
-Use [the RFC template](template.md) for new semantic decisions.
+Use [the RFC template](template.md) for new public-kernel contract decisions, applying the publication test first.

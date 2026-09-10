@@ -1,208 +1,107 @@
-# Structured Invocation Contract Boundary
+# Optional Structured Invocation Interoperability
 
-Status: architecture refinement / companion to `invokrum-instruction-boundary.md`  
-Date: 2026-08-12
+## Status
 
-## Purpose
+Deferred public extension note.
 
-Calathea's existing Invokrum boundary correctly makes composed instruction bytes attributable. This refinement makes explicit that **rendered instructions are a derived runtime artifact, not the canonical representation of workflow state**.
+The deterministic community kernel does not require an AI runtime or a portable structured-invocation protocol.
 
-Calathea owns structured project/workflow semantics. Invokrum owns deterministic composition and, when its portable invocation-state contract is stable, the portable invocation boundary. A runtime owns its private working state.
+This document records only the compatibility properties a future public adapter should preserve. The private Calathea product owns its complete workflow-state model, context selection, roles, model routing, review semantics, and AI paved-road policy.
 
-## Target model
+## Public interoperability principle
+
+A future structured invocation surface should keep three categories separate:
 
 ```text
-Calathea canonical state
-  - operation / goal
-  - project state revision
-  - selected inputs/evidence
-  - selected examples/context
-  - role
-  - requested capabilities
-  - constraints
-  - expected outputs
-          |
-          | compile/materialize
-          v
-Invokrum invocation boundary
-  - exact instruction artifact
-  - task-context identity
-  - constraints / requested capabilities
-  - output/evidence contract
-          |
-          v
-runtime / provider
-  - private working state
-          |
-          v
-validated output / evidence
-          |
-          v
-Calathea reviewed state transition
+caller-selected structured input
+        ↓
+optional instruction/provider adapter
+        ↓
+untrusted runtime output
 ```
 
-The existing exact-byte invariant remains important: if Invokrum returns an instruction artifact with a digest, only those exact bytes are covered by that artifact identity. This note adds a semantic layer above it; exact prompt bytes are not the whole workflow contract.
+The public kernel should not treat rendered prompt text, provider-private working state, or mutable chat history as an implicit canonical extension of kernel state.
 
-## Canonical versus derived state
+## Minimal candidate contract
 
-### Canonical Calathea state
-
-Canonical state remains governed by Calathea's existing source-of-truth and lifecycle RFCs. It includes the authoritative project/portfolio state and reviewed transitions used to decide what work should be attempted.
-
-### Structured invocation input
-
-At invocation time, Calathea selects a bounded snapshot of canonical and imported state:
+A concrete public adapter may eventually need a small versioned request containing only generic interoperability data, such as:
 
 ```yaml
-workflow_invocation:
-  operation: portfolio.orientation.review
-  project_state_revision: 42
-  project_state_digest: sha256:...
-  selected_evidence_refs: []
-  selected_context_refs: []
-  selected_example_refs: []
-  instruction_profile: orientation-review
-  requested_role: reviewer
-  requested_capabilities: []
+invocation:
+  operation: example.operation
+  input_revision: example-revision
+  selected_input_refs: []
+  instruction_artifact_ref: optional
   constraints: {}
-  output_contract: recommendation-draft/v1
+  output_contract: example/v1
 ```
 
-These field names are illustrative. A portable schema should be owned by the reusable Invokrum contract; Calathea should map to it rather than create a parallel protocol.
+These fields are illustrative and are **not** a committed schema.
 
-### Derived runtime instructions
+A real public schema should be introduced only with an independently useful implementation and conformance tests.
 
-Invokrum-composed instruction bytes, provider messages, prompt templates, and transport serialization are derived material.
+## Revision binding
 
-Rules:
+If an invocation claims to correspond to a specific versioned kernel input, the result must remain attributable to that input revision.
 
-- a rendered prompt must be attributable to the structured invocation and exact instruction identity;
-- changing authority-relevant Calathea state requires a new invocation identity;
-- mutable chat/history is not an implicit extension of canonical workflow state;
-- post-resolution mutation of instruction content creates a new artifact identity under the existing exact-byte rule;
-- provider request formatting does not turn the entire request into an Invokrum-attested artifact.
+If material input changes before execution/review, the caller or adapter must not silently rebind the old invocation to the newer state while preserving the old identity.
 
-### Runtime-private working state
+The exact stale/retry policy is a caller/product concern unless explicitly standardized by the public adapter.
 
-The runtime may maintain arbitrary intermediate computation. Calathea neither defines nor depends on its representation.
+## Data versus instruction
 
-Runtime-private state:
+Selected external excerpts, repository text, issue content, retrieved context, and similar inputs remain data unless deliberately introduced through a trusted instruction/configuration path.
 
-- cannot authorize capabilities or effects;
-- cannot silently mutate Calathea source-of-truth state;
-- is not automatically imported into feedback/learning;
-- need not be serializable for Calathea replay/audit claims.
+Untrusted input must not:
 
-## State revision binding
-
-Every AI invocation that can influence a `RecommendationDraft` should identify the exact Calathea state revision used to assemble it.
-
-If material source-of-truth state changes between assembly and execution:
-
-```text
-state r42 -> assemble invocation i7
-state r43 -> material project change
-invocation i7 -> stale
-```
-
-Calathea should reject, reassemble, or explicitly re-evaluate the invocation according to the operation's policy. It must not silently execute `i7` against `r43` while recording only the newer state.
-
-This parallels existing stale-state/optimistic-concurrency discipline and prevents AI context from becoming a hidden second source of truth.
-
-## Context selection
-
-Selected repository excerpts, issue text, historical records, examples, and retrieved memory are explicit invocation inputs or references.
-
-They remain data unless intentionally promoted through the trusted instruction/configuration path.
-
-Context selection must not:
-
-- select a more privileged Invokrum profile;
+- select a more privileged instruction configuration;
 - widen requested capabilities;
-- override canonical Calathea project state;
-- self-assert an authenticated runtime principal;
-- make imported text authoritative instruction material.
+- self-authorize external effects;
+- become executable instruction merely by appearing in context.
 
-## Capability and authority boundary
+## Runtime-private state
 
-Calathea may structurally request a role, capability, or constraint. That request is not executable authority.
+Provider/runtime intermediate computation is not automatically part of the public kernel state or audit contract.
 
-```text
-Calathea request
-      |
-      v
-Invokrum contract/materialization
-      |
-      v
-authenticated runtime principal (where used)
-      |
-      v
-policy/approval decision (where governed)
-      |
-      v
-bounded effect
-```
+A public adapter must not claim replayability of hidden provider state it cannot actually reproduce.
 
-This preserves clean ownership:
+## Output boundary
 
-- Calathea says what workflow operation is being attempted;
-- Invokrum makes the execution contract/materialization deterministic;
-- an identity layer establishes who/what is invoking where required;
-- a governance boundary decides whether consequential effects are allowed;
-- a runtime performs the computation/execution.
+Runtime/model output is untrusted until it satisfies the documented output contract and caller-side validation.
 
-Specific identity, governance, and runtime products remain optional adapters and are not dependencies of the Calathea core.
+Validation does not itself grant product-level authority or permission for external effects.
 
-## Feedback and learning
+## Security and failure properties
 
-Model/runtime output never mutates canonical state directly.
+A future public adapter should demonstrate:
 
-The existing Calathea pattern remains:
+- explicit enablement;
+- bounded inputs;
+- versioned request/output contracts;
+- out-of-band credential handling;
+- attribution to claimed input/instruction/provider identities;
+- stale/retry behavior that does not silently falsify provenance;
+- invalid/partial output rejection;
+- no mutation of deterministic kernel state on optional-adapter failure;
+- no reliance on private Calathea data, prompts, profiles, or runtime topology in public tests.
 
-```text
-untrusted output
-  -> validation
-  -> RecommendationDraft / evidence
-  -> review / accepted transition
-  -> canonical state revision
-```
+## Relationship to Invokrum
 
-Any future memory/learning feedback must reuse the same reviewed state-transition semantics. Intermediate runtime computation is not a memory source merely by existing.
+If Invokrum is used by a concrete public adapter, follow the narrow [Invokrum interoperability boundary](invokrum-instruction-boundary.md). Do not create a second Calathea-specific Invokrum protocol.
 
-## Runtime portability
+The private product may use a richer structured invocation model. That model is not automatically a public compatibility commitment.
 
-The conceptual invocation should support multiple execution styles without changing Calathea's domain model:
+## Non-goals
 
-1. ordinary request/response LLM provider;
-2. supervisor/specialist runtime;
-3. iterative/recurrent runtime whose private computation is not serialized as prompt text.
+This note does not define:
 
-The provider adapter may map the structured invocation differently for each target, but must preserve exact semantic inputs, output/evidence identity, and state-revision binding.
+- the private Calathea AI workflow model;
+- supervisor/specialist runtime architecture;
+- product roles or requested capabilities;
+- product context/evidence selection policy;
+- model routing or escalation policy;
+- feedback/learning strategy;
+- authorization/effect governance;
+- a committed portable invocation schema.
 
-## Failure modes to test
-
-- stale Calathea state revision after invocation assembly;
-- runtime context includes data not present in selected context refs;
-- imported data attempts to select a privileged instruction profile;
-- provider adapter mutates authoritative instruction bytes after Invokrum resolution;
-- capability request is treated as authority without authentication/governance;
-- runtime output attempts to mutate canonical state without a reviewed transition;
-- a resumed/retried invocation is incorrectly rebound to newer project state;
-- provider-private runtime state is mistakenly treated as canonical evidence.
-
-## Relationship to existing docs
-
-This note refines rather than replaces:
-
-- `docs/architecture/invokrum-instruction-boundary.md`;
-- `docs/architecture/runtime-boundaries.md`;
-- RFC-0005 state/history/source-of-truth semantics;
-- RFC-0006 project lifecycle/transitions;
-- RFC-0008 evidence/explanation/trace semantics;
-- review/feedback/learning semantics.
-
-The note should be reconciled into the Invokrum boundary when the portable invocation-state contract stabilizes.
-
-## Research motivation
-
-BDH-CQ (arXiv:2608.09888) is a useful external signal because it demonstrates that context acquisition and iterative computation can be architecturally separate. Calathea's durable response is therefore to keep workflow semantics structured and model-neutral, not to depend on prompt text as the universal program representation.
+Promote only the minimum contract once a concrete public consumer exists.

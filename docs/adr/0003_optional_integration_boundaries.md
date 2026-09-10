@@ -1,43 +1,49 @@
-# ADR 0003 — Optional Integration Boundaries and No Anthesis Dependency
+# ADR 0003 — Optional Adapter Boundaries
 
 ## Status
 
-Accepted for v0 planning.
+Accepted for the public community kernel.
 
 ## Context
 
-Calathea may later integrate with repositories, AI providers, or effectful external systems. Earlier planning risked coupling the architecture directly to Anthesis despite v0 being read-only and human-authoritative.
+The deterministic kernel must remain independently usable without coupling core/domain behavior to repositories, AI providers, instruction systems, governance platforms, or effect executors.
+
+Earlier architecture text described several private-product integration directions in this public ADR. Under the private-product/public-kernel boundary, this ADR now records only the reusable implementation decision required here.
 
 ## Decision
 
-All v0 external integrations are optional outward adapters behind stable inward-owned ports.
+External integrations are optional outward adapters behind stable inward-owned ports, introduced only when a concrete public use case requires them.
 
-For v0:
+For the deterministic public kernel:
 
-- repository/source adapters are optional and read-only;
-- AI-provider adapters are optional and non-authoritative;
-- no effectful external adapter is required;
-- no effect-governance or effect-execution port exists;
-- Calathea has no dependency on Anthesis.
+- no external-source adapter is mandatory;
+- no AI/provider/instruction adapter is mandatory;
+- no effectful external adapter is part of ambient kernel authority;
+- no governance/effect platform is a required core dependency;
+- removing optional adapters leaves the documented offline deterministic workflow functional.
 
-If effectful capabilities are added later, a new RFC/ADR must define their boundaries. Authorization/approval and effect execution must remain distinct: a governance adapter may decide whether an effect is permitted, while a separate effect adapter performs the external mutation and records its result.
+Any supported public adapter must keep adapter-specific transport/configuration outside the domain core and preserve the kernel's validation, provenance, privacy, and failure invariants.
 
-Anthesis may implement a future governance/authorization adapter, but Anthesis-specific identities, policy objects, approval models, or effect semantics must not enter the Calathea core domain.
-
-Removing every optional integration adapter must leave the deterministic UC-01 workflow functional.
+If effectful capabilities are ever added publicly, authorization/approval and effect execution must be explicit separate concerns rather than inferred from a recommendation or ordinary adapter access.
 
 ## Consequences
 
-Benefits:
+### Benefits
 
+- preserves local/offline standalone operation;
 - avoids speculative platform coupling;
-- preserves local/offline operation;
-- preserves the domain invariant that decisions are not effects;
-- allows Anthesis integration later without making it foundational;
-- allows alternative governance or execution implementations if requirements change.
+- keeps provider-specific details out of deterministic/core semantics;
+- allows independently useful adapters to evolve behind explicit contracts;
+- prevents recommendation behavior from acquiring accidental effect authority.
 
-Costs:
+### Costs
 
-- effectful workflows require a later explicit architecture decision;
-- future adapters may require translation between Calathea domain concepts and external governance/effect models;
-- Calathea cannot assume Anthesis-specific convenience features in its core API.
+- each concrete adapter requires an explicit public contract and tests;
+- private Calathea integrations may need translation around the public process/file/schema surface;
+- convenience features from a particular provider cannot leak into the core API without compatibility review.
+
+## Boundary with private Calathea
+
+The private product may choose specific AI, instruction, governance, source, or effect integrations and may define stricter policies around them.
+
+Those choices do not become public-kernel dependencies or ADR concerns unless a concrete independently useful public adapter is deliberately supported.
