@@ -4,9 +4,7 @@
 
 Public RFCs in this repository define durable **kernel behavior, compatibility, safety, or extension contracts**.
 
-They do not own the complete private Calathea product strategy, roadmap, full use-case model, planning/review/lifecycle policy, prioritization philosophy, calibration, AI paved road, dogfood, or private operating assumptions.
-
-The private `hackelia-micrantha/calathea` repository is canonical for those product decisions.
+They do not own the complete Calathea product strategy, roadmap, planning/review/lifecycle policy, prioritization philosophy, calibration, AI paved road, dogfood, or private operating assumptions. Those are private product decisions in `hackelia-micrantha/calathea`.
 
 ## Publication test
 
@@ -18,36 +16,35 @@ Before adding or expanding a public RFC, ask:
 - **No:** keep the decision private.
 - **Mixed:** split the concern; public owns interface/behavior/versioning, private owns product rationale/policy/defaults/calibration.
 
-A concept being broadly reusable is not sufficient reason to make the entire product decision public.
+"Reusable" alone is not sufficient reason to publish the full product decision.
 
 ## Status model
 
 - **Proposed** — under review; not yet a public compatibility commitment.
-- **Accepted** — authoritative for the public-kernel scope stated by the RFC.
+- **Accepted** — authoritative for the stated public-kernel scope.
+- **Deferred** — no current standalone/public surface requires the broader behavior; retained as a boundary marker.
 - **Superseded** — replaced by a named later public contract; retained for history.
 - **Rejected** — considered but not adopted.
 
-Material compatibility changes use an amendment or superseding RFC rather than silently rewriting accepted behavior.
+Material compatibility changes use an amendment or superseding RFC rather than silently changing supported behavior.
 
-## Existing RFC 0000–0008 migration classification
+## Current RFC index
 
-These RFCs were promoted when this repository was treated as canonical for broad reusable product/domain semantics. Issue #48 is contracting that boundary.
+RFC 0000–0008 were originally promoted under a broader public-product ownership model. Issue #48 narrows those files in place so historical links remain valid while current head exposes only the community-kernel contract.
 
-The existing files remain historical/current implementation references until each contraction is reviewed. Target ownership is:
+| RFC | Status | Current public scope |
+| --- | --- | --- |
+| [0000 — Community Kernel Record and Identity Model](../rfc_0000_conceptual_domain_model.md) | Accepted | Record identity/versioning/state distinctions needed by supported public process/file/schema behavior |
+| [0001 — Deterministic Evaluation Contract](../rfc_0001_evaluation_orientation_semantics.md) | Accepted | Deterministic evaluation inputs/outputs/versioning; excludes private calibration and strategic interpretation |
+| [0002 — Deterministic Orientation Contract](../rfc_0002_orientation_engine_policy_semantics.md) | Accepted | Deterministic placement/ordering/capacity/diagnostic behavior exposed by the kernel |
+| [0003 — Public Review Extension Boundary](../rfc_0003_review_feedback_and_learning_semantics.md) | Deferred | Boundary for future concrete public review state; complete review/learning strategy is private |
+| [0004 — Optional AI Adapter Safety Contract](../rfc_0004_ai_governance_paved_road_and_tooling_policy.md) | Accepted | Validation, non-authority, data/safety and adapter compatibility constraints only |
+| [0005 — Public State, History, Replay, and Persistence Invariants](../rfc_0005_state_history_and_source_of_truth.md) | Accepted | Persisted/history/replay guarantees required by supported public formats |
+| [0006 — Lifecycle Compatibility Boundary](../rfc_0006_project_lifecycle_and_transitions.md) | Deferred | Separation of orientation from lifecycle plus any explicitly exposed lifecycle serialization/transition behavior |
+| [0007 — Policy Evaluation and Composition Compatibility](../rfc_0007_policy_model_and_decision_semantics.md) | Accepted | Evaluator identity/versioning, deterministic composition, result classes, validation and trace compatibility |
+| [0008 — Evidence, Provenance, and Trace Compatibility](../rfc_0008_evidence_explanation_and_trace_semantics.md) | Accepted | Evidence/source identity, provenance, trace/reason-code, redaction and replay compatibility |
 
-| RFC | Target public scope |
-| --- | --- |
-| [0000 — Conceptual Domain Model and Canonical Terminology](../rfc_0000_conceptual_domain_model.md) | **Split** — retain serialized/core identity/versioning invariants required by public behavior; private owns complete product model/terminology |
-| [0001 — Evaluation Semantics](../rfc_0001_evaluation_orientation_semantics.md) | **Split** — retain deterministic evaluation contract; private owns calibration and product interpretation |
-| [0002 — Orientation Engine Semantics](../rfc_0002_orientation_engine_policy_semantics.md) | **Mostly public** where queueing/tie-breaking/diagnostics are exposed kernel behavior; private owns portfolio defaults/policy strategy |
-| [0003 — Review, Feedback, and Calibration](../rfc_0003_review_feedback_and_learning_semantics.md) | **Mostly private** — retain only concrete public state/compatibility mechanisms if exposed |
-| [0004 — AI Interaction and Governance Boundary](../rfc_0004_ai_governance_paved_road_and_tooling_policy.md) | **Mostly private** — public only generic adapter validation/safety/interoperability required by a supported surface |
-| [0005 — State, History, and Source of Truth](../rfc_0005_state_history_and_source_of_truth.md) | **Split** — retain persistence/replay/migration invariants required by public formats; private owns broader product authority/retention policy |
-| [0006 — Project Lifecycle](../rfc_0006_project_lifecycle_and_transitions.md) | **Mostly private** — public only serialized state/transition behavior required by supported kernel workflows |
-| [0007 — Policy Model and Decision Semantics](../rfc_0007_policy_model_and_decision_semantics.md) | **Split** — retain public evaluator/composition contract; private owns policy philosophy/defaults/calibration |
-| [0008 — Evidence, Explanation, Provenance, Trace](../rfc_0008_evidence_explanation_and_trace_semantics.md) | **Split** — retain public evidence/provenance shapes and safety/redaction invariants; private owns broader product review/explanation strategy |
-
-Until a file is narrowed, its historical breadth must not be used as precedent for adding new private-product semantics publicly.
+The complete product counterparts are private and may be broader than these public contracts.
 
 ## RFC rules
 
@@ -57,7 +54,7 @@ Until a file is narrowed, its historical breadth must not be used as precedent f
 4. Compatibility, migration, validation, failure/recovery, security, and privacy implications must be explicit.
 5. Accepted compatibility history is not silently rewritten.
 6. Internal implementation choices belong in ADRs when they do not alter a public contract.
-7. If no external/public contract is affected, prefer an ADR, issue, test, or private product RFC rather than broadening the public RFC surface.
+7. If no external/public contract is affected, prefer an ADR, issue, test, or private product RFC rather than broadening this RFC surface.
 
 ## Traceability
 
@@ -75,7 +72,7 @@ PR
 synthetic validation / compatibility evidence
 ```
 
-When the work originates from private Calathea, the cross-repository trace is:
+When work originates from private Calathea:
 
 ```text
 private product requirement
@@ -102,18 +99,18 @@ A material public RFC change must state:
 
 Superseded RFCs remain available for history.
 
-## Deferred/public non-goals
+## Public non-goals
 
 Do not use public RFCs to speculatively define:
 
 - complete private planning/review/lifecycle strategy;
 - private AI model routing or prompt/profile policy;
 - automatic policy/weight/heuristic learning;
-- a generic plugin marketplace or policy DSL;
+- a generic plugin marketplace or unrestricted policy DSL;
 - private stakeholder/maintenance strategy;
 - hosted control-plane/product strategy;
 - dogfood-derived defaults without a deliberate publication decision.
 
 ## Template
 
-Use [the RFC template](template.md) for new public-kernel contract decisions, applying the publication test above first.
+Use [the RFC template](template.md) for new public-kernel contract decisions, applying the publication test first.
