@@ -144,7 +144,7 @@ If a private product requirement requires a new kernel capability:
 
 Public RFCs own durable kernel semantics and compatibility commitments. They should not be used as a default home for full product philosophy, strategy, or policy.
 
-Existing RFC 0000–0008 are under classification in issue #48. The target is to retain, split, narrow, or retire current-head material according to public compatibility need while preserving git history.
+RFC 0000–0008 were narrowed in place under issue #48 according to public compatibility need while preserving historical filenames and git history.
 
 Public ADRs remain appropriate for implementation choices made by this repository.
 
@@ -173,16 +173,16 @@ The executable/core extraction remains valid:
 
 ### Boundary contraction
 
-Tracked by issue #48 and private `calathea#59`.
+Tracked by issue #48 and private `calathea#59` and implemented by PR #50.
 
-Current migration work:
+This branch:
 
-- reposition README around kernel scope;
-- replace public product PRD/use-case/roadmap text with kernel-scoped documents;
-- change RFC governance from full product semantics to kernel/compatibility semantics;
-- classify RFC 0000–0008;
-- audit ADR/architecture docs for product-strategy leakage;
-- keep build/test/standalone usability unchanged.
+- repositions the README around kernel scope;
+- narrows public product PRD/use-case/roadmap text to kernel-scoped documents;
+- changes RFC governance from full product semantics to kernel/compatibility semantics;
+- contracts RFC 0000–0008 in place;
+- audits and narrows ADR/architecture docs that exposed private-product strategy;
+- intentionally leaves public build/test/module/process behavior unchanged.
 
 Historical public product text remains available in git history; history is not rewritten to simulate that the earlier boundary never existed.
 
