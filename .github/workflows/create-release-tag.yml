@@ -1,0 +1,138 @@
+name: Create Release Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Commit or branch to tag; must resolve to current main
+        required: true
+        default: main
+        type: string
+      confirmation:
+        description: Type CREATE TAG
+        required: true
+        type: string
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: create-release-tag
+  cancel-in-progress: false
+
+jobs:
+  create-tag:
+    name: Validate and create immutable release tag
+    runs-on: runner-calathea
+    timeout-minutes: 15
+    steps:
+      - name: Check out complete repository history without credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve and validate release tag
+        id: release
+        env:
+          TARGET: ${{ inputs.target }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$CONFIRMATION" != "CREATE TAG" ]; then
+            echo "confirmation must be exactly CREATE TAG" >&2
+            exit 1
+          fi
+
+          git fetch --force --prune --tags origin main
+          main_sha="$(git rev-parse origin/main^{commit})"
+          target_sha="$(git rev-parse "$TARGET^{commit}")"
+          if [ "$target_sha" != "$main_sha" ]; then
+            echo "target must resolve to current origin/main" >&2
+            echo "target: $target_sha" >&2
+            echo "main:   $main_sha" >&2
+            exit 1
+          fi
+
+          version="$(tr -d '\n' < VERSION)"
+          tag="v${version}"
+          nix develop --command python3 scripts/release.py validate-tag --tag "$tag"
+
+          if git show-ref --verify --quiet "refs/tags/$tag"; then
+            echo "tag already exists: $tag" >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "remote tag already exists: $tag" >&2
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Require successful CI for exact current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.release.outputs.target_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          successful_runs="$(
+            nix develop --command gh api --method GET \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+              -f branch=main \
+              -f event=push \
+              -f head_sha="$TARGET_SHA" \
+              -f per_page=20 \
+              --jq '[.workflow_runs[] | select(.status == "completed" and .conclusion == "success")] | length'
+          )"
+
+          if [ "$successful_runs" -lt 1 ]; then
+            echo "exact current main has no successful completed CI push run: $TARGET_SHA" >&2
+            exit 1
+          fi
+
+      - name: Create annotated tag object
+        id: tag_object
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          TARGET_SHA: ${{ steps.release.outputs.target_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_object_sha="$(
+            nix develop --command gh api \
+              --method POST \
+              "repos/$GITHUB_REPOSITORY/git/tags" \
+              -f tag="$TAG" \
+              -f message="Calathea $TAG" \
+              -f object="$TARGET_SHA" \
+              -f type=commit \
+              --jq .sha
+          )"
+          echo "sha=$tag_object_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Publish immutable tag reference
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          TAG_OBJECT_SHA: ${{ steps.tag_object.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix develop --command gh api \
+            --method POST \
+            "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$TAG" \
+            -f sha="$TAG_OBJECT_SHA"
+
+      - name: Dispatch release workflow at immutable tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: nix develop --command gh workflow run release.yml --ref "$TAG"
