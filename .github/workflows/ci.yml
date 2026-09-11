@@ -56,3 +56,55 @@ jobs:
 
       - name: Build CLI
         run: nix develop --command mise run build
+
+      - name: Validate release metadata
+        run: |
+          version="$(tr -d '\n' < VERSION)"
+          nix develop --command python3 scripts/release.py validate-tag --tag "v${version}"
+
+      - name: Verify standalone Nix contract
+        run: |
+          nix flake check
+          nix build .#calathea
+          version="$(tr -d '\n' < VERSION)"
+          test "$(./result/bin/calathea version)" = "calathea ${version}"
+
+      - name: Dry-run deterministic release packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '\n' < VERSION)"
+          epoch="$(git show -s --format=%ct HEAD)"
+          revision="$(git rev-parse HEAD)"
+          rm -rf .ci-release
+          mkdir -p .ci-release/target .ci-release/dist
+
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -trimpath \
+            -ldflags "-s -w -X github.com/hackelia-micrantha/calathea-community/internal/application.Version=${version}" \
+            -o .ci-release/target/calathea ./cmd/calathea
+
+          nix develop --command python3 scripts/release.py sbom \
+            --target linux-amd64 \
+            --output .ci-release/dist/calathea-v${version}-linux-amd64.spdx.json \
+            --epoch "$epoch" \
+            --revision "$revision"
+
+          nix develop --command python3 scripts/release.py package \
+            --target linux/amd64 \
+            --binary .ci-release/target/calathea \
+            --sbom .ci-release/dist/calathea-v${version}-linux-amd64.spdx.json \
+            --dist .ci-release/dist \
+            --epoch "$epoch"
+
+          archive=".ci-release/dist/calathea_${version}_linux_amd64.tar.gz"
+          checksum="${archive}.sha256"
+          test -s "$archive"
+          test -s "$checksum"
+          (cd .ci-release/dist && sha256sum -c "$(basename "$checksum")")
+
+          verify_dir="$(mktemp -d)"
+          tar -C "$verify_dir" -xzf "$archive"
+          test "$("$verify_dir/calathea" version)" = "calathea ${version}"
+          test -s "$verify_dir/SBOM.spdx.json"
+          rm -rf "$verify_dir" .ci-release
