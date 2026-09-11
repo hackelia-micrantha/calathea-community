@@ -10,8 +10,9 @@ import (
 	"io"
 )
 
-// Version is the development version until release packaging supplies a build version.
-const Version = "dev"
+// Version identifies the executable build. Release packaging overrides the
+// development default with -ldflags -X.
+var Version = "dev"
 
 // Run executes the minimal CLI application boundary and returns a process exit code.
 // Feature commands are introduced by later roadmap issues; this skeleton exists to
