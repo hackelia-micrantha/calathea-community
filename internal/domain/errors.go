@@ -26,14 +26,6 @@ func errInvalidDisposition(disposition Disposition) error {
 	return fmt.Errorf("invalid orientation disposition %q", disposition)
 }
 
-func errTraceOperationMismatch() error {
-	return fmt.Errorf("orientation run operation id must match trace operation id")
-}
-
-func errDuplicateProjectRecommendation(projectID ProjectID) error {
-	return fmt.Errorf("project %q has more than one placement recommendation", projectID)
-}
-
 func errDuplicateProjectOverride(projectID ProjectID) error {
 	return fmt.Errorf("project %q has more than one placement override", projectID)
 }
