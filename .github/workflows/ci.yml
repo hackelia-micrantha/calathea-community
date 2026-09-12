@@ -108,3 +108,9 @@ jobs:
           test "$("$verify_dir/calathea" version)" = "calathea ${version}"
           test -s "$verify_dir/SBOM.spdx.json"
           rm -rf "$verify_dir" .ci-release
+
+      - name: Verify producer flake lock stayed immutable
+        run: |
+          test -s flake.lock
+          git ls-files --error-unmatch flake.lock >/dev/null
+          git diff --exit-code -- flake.lock
