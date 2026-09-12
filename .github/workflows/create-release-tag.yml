@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Resolve and validate release tag
+      - name: Resolve and validate release target
         id: release
         env:
           TARGET: ${{ inputs.target }}
@@ -57,9 +57,15 @@ jobs:
             exit 1
           fi
 
+          git checkout --detach "$target_sha"
+          test "$(git rev-parse HEAD^{commit})" = "$target_sha"
+
           version="$(tr -d '\n' < VERSION)"
           tag="v${version}"
+          test -s flake.lock
+          git ls-files --error-unmatch flake.lock >/dev/null
           nix develop --command python3 scripts/release.py validate-tag --tag "$tag"
+          git diff --exit-code -- flake.lock
 
           if git show-ref --verify --quiet "refs/tags/$tag"; then
             echo "tag already exists: $tag" >&2
@@ -94,6 +100,22 @@ jobs:
             echo "exact current main has no successful completed CI push run: $TARGET_SHA" >&2
             exit 1
           fi
+          git diff --exit-code -- flake.lock
+
+      - name: Reconfirm release target is still current main
+        env:
+          TARGET_SHA: ${{ steps.release.outputs.target_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --prune origin main
+          current_main_sha="$(git rev-parse origin/main^{commit})"
+          if [ "$current_main_sha" != "$TARGET_SHA" ]; then
+            echo "main advanced after release validation" >&2
+            echo "validated: $TARGET_SHA" >&2
+            echo "current:   $current_main_sha" >&2
+            exit 1
+          fi
 
       - name: Create annotated tag object
         id: tag_object
@@ -114,25 +136,41 @@ jobs:
               -f type=commit \
               --jq .sha
           )"
+          git diff --exit-code -- flake.lock
           echo "sha=$tag_object_sha" >> "$GITHUB_OUTPUT"
 
       - name: Publish immutable tag reference
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
+          TARGET_SHA: ${{ steps.release.outputs.target_sha }}
           TAG_OBJECT_SHA: ${{ steps.tag_object.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
+
+          git fetch --force --prune origin main
+          current_main_sha="$(git rev-parse origin/main^{commit})"
+          if [ "$current_main_sha" != "$TARGET_SHA" ]; then
+            echo "main advanced before tag publication; refusing to publish release tag" >&2
+            echo "validated: $TARGET_SHA" >&2
+            echo "current:   $current_main_sha" >&2
+            exit 1
+          fi
+
           nix develop --command gh api \
             --method POST \
             "repos/$GITHUB_REPOSITORY/git/refs" \
             -f ref="refs/tags/$TAG" \
             -f sha="$TAG_OBJECT_SHA"
+          git diff --exit-code -- flake.lock
 
       - name: Dispatch release workflow at immutable tag
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
         shell: bash
-        run: nix develop --command gh workflow run release.yml --ref "$TAG"
+        run: |
+          set -euo pipefail
+          nix develop --command gh workflow run release.yml --ref "$TAG"
+          git diff --exit-code -- flake.lock
