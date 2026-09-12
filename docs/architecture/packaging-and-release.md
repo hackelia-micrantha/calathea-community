@@ -58,6 +58,8 @@ nix flake check
 
 The package install check executes the built binary and requires its reported version to match `VERSION` exactly.
 
+The producer repository commits `flake.lock` as reviewed release input. Changes to Nix inputs therefore update `flake.nix` and `flake.lock` together through review; CI and release jobs fail if Nix mutates the committed lock while evaluating the candidate. This prevents an implicit lock resolution from becoming part of an otherwise immutable release.
+
 The Nix package is repository-owned and has no dependency on private Calathea data, Dubnium host configuration, credentials, or effect authority.
 
 ## Release publication
@@ -66,20 +68,21 @@ Release publication uses an immutable reviewed tag rather than a mutable release
 
 For version `<VERSION>`:
 
-1. update `VERSION` and `RELEASE_NOTES_v<VERSION>.md` through ordinary review;
+1. update `VERSION`, `RELEASE_NOTES_v<VERSION>.md`, and any reviewed producer lock changes through ordinary review;
 2. merge the reviewed release/package changes to `main`;
 3. require a successful `CI` **push** run whose `head_sha` is exact current `main`;
-4. explicitly dispatch `Create Release Tag`, which requires the target to resolve to that exact current `main`, verifies the successful exact-main CI evidence, and requires an operator confirmation;
-5. that workflow validates the reviewed version metadata and creates annotated immutable tag `v<VERSION>`;
-6. the tag-targeted `Release` workflow independently proves the tag commit is the triggered commit and remains on `main`;
-7. the release workflow reruns the repository quality gate and standalone Nix package gate at the immutable tag;
-8. only after those gates pass, create or reuse a **draft** GitHub prerelease;
-9. build deterministic target archives, per-target SHA-256 checksums, and SPDX metadata from the tagged source timestamp;
-10. attest each archive's build provenance and SPDX metadata;
-11. upload all immutable release inputs while the release remains draft;
-12. publish the prerelease only after every target build and attestation succeeds.
+4. explicitly dispatch `Create Release Tag`, which requires the target to resolve to that exact current `main`, checks out that exact target commit before reading release metadata, verifies the successful exact-main CI evidence, and requires an operator confirmation;
+5. re-confirm that `main` has not advanced before publishing the immutable tag reference;
+6. create annotated immutable tag `v<VERSION>`;
+7. the tag-targeted `Release` workflow independently proves the tag commit is the triggered commit and remains on `main`;
+8. the release workflow reruns the repository quality gate and standalone Nix package gate at the immutable tag;
+9. only after those gates pass, create or reuse a **draft** GitHub prerelease;
+10. build deterministic target archives, per-target SHA-256 checksums, and SPDX metadata from the tagged source timestamp;
+11. attest each archive's build provenance and SPDX metadata;
+12. upload all immutable release inputs while the release remains draft;
+13. publish the prerelease only after every target build and attestation succeeds.
 
-This exact-main-CI check is intentionally redundant with normal merge policy. It prevents release-tag creation if repository branch settings or auto-merge behavior admit a commit before its canonical post-merge CI has completed successfully.
+The exact-main-CI and final-main rechecks are intentionally redundant with normal merge policy. They prevent release-tag creation if repository branch settings or auto-merge behavior admit a commit before its canonical post-merge CI has completed successfully, or if `main` advances while release authority is being exercised.
 
 `v0.1.0-alpha.1` is published as a prerelease. A later stable version can use the same boundary with an explicit publication-policy change rather than weakening provenance checks.
 
@@ -132,6 +135,8 @@ inputs.calathea = {
 ```
 
 The consumer commits its `flake.lock`, which resolves that human-readable tag to an exact source revision and NAR content identity. The consumer then selects `calathea.packages.${system}.default` or `.calathea` and owns any host/profile wiring.
+
+The producer and consumer lockfiles have different ownership roles: the producer lock makes Calathea's own package evaluation reproducible; the consumer lock records the exact Calathea source identity and compatibility graph selected by that consumer.
 
 This deliberately mirrors other Micrantha public-adapter integrations: the producer owns packaging and release provenance; the consumer does **not** repackage the binary merely to install it.
 
