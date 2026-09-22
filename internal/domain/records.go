@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"sort"
+	"time"
+)
 
 // Portfolio is the stable identity of one oriented project collection.
 type Portfolio struct {
@@ -113,15 +117,18 @@ func NewPolicySet(id PolicySetID) (PolicySet, error) {
 
 func (p PolicySet) ID() PolicySetID { return p.id }
 
-// PolicySetVersion identifies one immutable fully resolved policy configuration.
-// Policy instances are introduced by the policy semantic contract.
+// PolicySetVersion is one immutable, fully resolved policy configuration.
+// The variadic instance input preserves the pre-activation identity-only
+// constructor shape while allowing activated versions to retain their exact
+// deterministic evaluator configuration.
 type PolicySetVersion struct {
 	id          PolicySetVersionID
 	policySetID PolicySetID
 	createdAt   time.Time
+	instances   []PolicyInstance
 }
 
-func NewPolicySetVersion(id PolicySetVersionID, policySetID PolicySetID, createdAt time.Time) (PolicySetVersion, error) {
+func NewPolicySetVersion(id PolicySetVersionID, policySetID PolicySetID, createdAt time.Time, instances ...PolicyInstance) (PolicySetVersion, error) {
 	if err := requireIdentifier("policy set version id", string(id)); err != nil {
 		return PolicySetVersion{}, err
 	}
@@ -131,12 +138,53 @@ func NewPolicySetVersion(id PolicySetVersionID, policySetID PolicySetID, created
 	if createdAt.IsZero() {
 		return PolicySetVersion{}, errZeroTime("policy set version created at")
 	}
-	return PolicySetVersion{id: id, policySetID: policySetID, createdAt: createdAt}, nil
+
+	resolved := append([]PolicyInstance(nil), instances...)
+	seen := make(map[PolicyInstanceID]struct{}, len(resolved))
+	for _, instance := range resolved {
+		if err := requireIdentifier("policy instance id", string(instance.ID())); err != nil {
+			return PolicySetVersion{}, err
+		}
+		if _, exists := seen[instance.ID()]; exists {
+			return PolicySetVersion{}, fmt.Errorf("policy instance id %q is duplicated", instance.ID())
+		}
+		seen[instance.ID()] = struct{}{}
+	}
+	sort.SliceStable(resolved, func(i, j int) bool {
+		if policyPhaseOrder(resolved[i].Phase()) != policyPhaseOrder(resolved[j].Phase()) {
+			return policyPhaseOrder(resolved[i].Phase()) < policyPhaseOrder(resolved[j].Phase())
+		}
+		if resolved[i].Priority() != resolved[j].Priority() {
+			return resolved[i].Priority() < resolved[j].Priority()
+		}
+		if resolved[i].PolicyID() != resolved[j].PolicyID() {
+			return resolved[i].PolicyID() < resolved[j].PolicyID()
+		}
+		return resolved[i].ID() < resolved[j].ID()
+	})
+
+	return PolicySetVersion{id: id, policySetID: policySetID, createdAt: createdAt, instances: resolved}, nil
 }
 
 func (v PolicySetVersion) ID() PolicySetVersionID   { return v.id }
 func (v PolicySetVersion) PolicySetID() PolicySetID { return v.policySetID }
 func (v PolicySetVersion) CreatedAt() time.Time     { return v.createdAt }
+func (v PolicySetVersion) Instances() []PolicyInstance {
+	return append([]PolicyInstance(nil), v.instances...)
+}
+
+func policyPhaseOrder(phase PolicyPhase) int {
+	switch phase {
+	case PolicyPhaseCandidateEligibility:
+		return 1
+	case PolicyPhaseCandidateAdjustment:
+		return 2
+	case PolicyPhaseSetConstraints:
+		return 3
+	default:
+		return 100
+	}
+}
 
 // PolicySelectionRecord is the implementation-level record that makes the current
 // effective PolicySetVersion rebuildable. The RFC glossary intentionally does not
