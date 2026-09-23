@@ -225,6 +225,7 @@ func TestExceptionMultiUseAndRevocationAsOf(t *testing.T) {
 
 func TestExceptionEffectiveIntervalAndTargetBinding(t *testing.T) {
 	req, in := exceptionFixture(t)
+	req.Decision.createdAt = in.CreatedAt
 	req.At = in.EffectiveAt.Add(-time.Nanosecond)
 	if _, err := ValidateAndApplyPolicyException(req); err == nil {
 		t.Fatal("accepted exception before effective time")
