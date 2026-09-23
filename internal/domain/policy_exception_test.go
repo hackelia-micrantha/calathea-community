@@ -337,6 +337,58 @@ func TestExceptionRejectsOverusedOrBackdatedHistory(t *testing.T) {
 	}(), "historical_write")
 }
 
+func TestExceptionHistoryOrderDoesNotChangeRevocationOrRetry(t *testing.T) {
+	req, in := exceptionFixture(t)
+	in.MaximumUses = 2
+	var err error
+	req.Exception, err = NewPolicyException(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := ValidateAndApplyPolicyException(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.PriorApplications = []PolicyExceptionApplication{first}
+	req.OperationID, req.ID = "operation-2", "application-2"
+	req.Decision.operationID, req.Decision.id = req.OperationID, "decision-2"
+	req.At = req.At.Add(time.Minute)
+	second, err := ValidateAndApplyPolicyException(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	earlier, err := NewPolicyExceptionRevocation("rev-1", in.ID, in.Actor, "review completed", second.AppliedAt().Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	later, err := NewPolicyExceptionRevocation("rev-2", in.ID, in.Actor, "confirm revocation", earlier.RevokedAt().Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.OperationID, req.ID = "operation-3", "application-3"
+	req.Decision.operationID, req.Decision.id = req.OperationID, "decision-3"
+	req.At = later.RevokedAt().Add(time.Minute)
+	for _, tc := range []struct {
+		apps []PolicyExceptionApplication
+		revs []PolicyExceptionRevocation
+	}{
+		{[]PolicyExceptionApplication{first, second}, []PolicyExceptionRevocation{earlier, later}},
+		{[]PolicyExceptionApplication{second, first}, []PolicyExceptionRevocation{later, earlier}},
+	} {
+		req.PriorApplications, req.Revocations = tc.apps, tc.revs
+		_, err := ValidateAndApplyPolicyException(req)
+		requireExceptionCode(t, err, "revoked")
+		req.OperationID, req.ID = first.OperationID(), "retry-id"
+		req.Decision.operationID, req.Decision.id = req.OperationID, first.PolicyDecisionID()
+		retry, err := ValidateAndApplyPolicyException(req)
+		if err != nil || retry.ID() != first.ID() {
+			t.Fatalf("valid historical retry changed with shuffled records: %v", err)
+		}
+		req.OperationID, req.ID = "operation-3", "application-3"
+		req.Decision.operationID, req.Decision.id = req.OperationID, "decision-3"
+	}
+}
+
 func TestExceptionRevocationAuthorityAndForeignHistory(t *testing.T) {
 	req, _ := exceptionFixture(t)
 	if _, err := NewPolicyExceptionRevocation("rev-1", req.Exception.ID(), Actor{}, "invalid", req.At); err == nil {
