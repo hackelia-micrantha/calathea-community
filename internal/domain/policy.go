@@ -11,7 +11,7 @@ import (
 type PolicyExceptionDeviation string
 
 const (
-	PolicyExceptionAllowDenial  PolicyExceptionDeviation = "allow_denial"
+	PolicyExceptionAllowDenial   PolicyExceptionDeviation = "allow_denial"
 	PolicyExceptionSatisfyReview PolicyExceptionDeviation = "satisfy_review"
 )
 
@@ -76,26 +76,44 @@ func NewPolicyException(in PolicyExceptionInput) (PolicyException, error) {
 		{"evaluator version", in.EvaluatorVersion},
 		{"configuration schema version", in.ConfigurationSchemaVersion},
 	} {
-		if err := requireIdentifier(f.kind, f.value); err != nil { return PolicyException{}, err }
+		if err := requireIdentifier(f.kind, f.value); err != nil {
+			return PolicyException{}, err
+		}
 	}
 	if !in.Workflow.Valid() || !in.Phase.Valid() || !in.Subject.valid() || !in.Deviation.Valid() {
 		return PolicyException{}, fmt.Errorf("invalid exception workflow, phase, subject, or deviation")
 	}
-	if !in.Actor.IsMaintainer() { return PolicyException{}, errMaintainerAuthority("policy exception") }
-	if err := requireText("policy exception rationale", in.Rationale); err != nil { return PolicyException{}, err }
-	if len(in.EvidenceIDs) == 0 { return PolicyException{}, fmt.Errorf("policy exception requires supporting evidence") }
-	if err := validateEvidenceIDs(in.EvidenceIDs); err != nil { return PolicyException{}, err }
+	if !in.Actor.IsMaintainer() {
+		return PolicyException{}, errMaintainerAuthority("policy exception")
+	}
+	if err := requireText("policy exception rationale", in.Rationale); err != nil {
+		return PolicyException{}, err
+	}
+	if len(in.EvidenceIDs) == 0 {
+		return PolicyException{}, fmt.Errorf("policy exception requires supporting evidence")
+	}
+	if err := validateEvidenceIDs(in.EvidenceIDs); err != nil {
+		return PolicyException{}, err
+	}
 	if in.CreatedAt.IsZero() || in.EffectiveAt.IsZero() || in.ExpiresAt.IsZero() ||
 		in.CreatedAt.After(in.EffectiveAt) || !in.EffectiveAt.Before(in.ExpiresAt) {
 		return PolicyException{}, fmt.Errorf("invalid exception creation/effective/expiry times")
 	}
-	if in.MaximumUses <= 0 { return PolicyException{}, fmt.Errorf("exception maximum uses must be positive") }
+	if in.MaximumUses <= 0 {
+		return PolicyException{}, fmt.Errorf("exception maximum uses must be positive")
+	}
 	if in.Supersedes != nil {
-		if err := requireIdentifier("superseded exception id", string(*in.Supersedes)); err != nil { return PolicyException{}, err }
-		if *in.Supersedes == in.ID { return PolicyException{}, errSelfReference("policy exception supersedes") }
+		if err := requireIdentifier("superseded exception id", string(*in.Supersedes)); err != nil {
+			return PolicyException{}, err
+		}
+		if *in.Supersedes == in.ID {
+			return PolicyException{}, errSelfReference("policy exception supersedes")
+		}
 	}
 	if in.RelatedDecisionID != nil {
-		if err := requireIdentifier("related policy decision id", string(*in.RelatedDecisionID)); err != nil { return PolicyException{}, err }
+		if err := requireIdentifier("related policy decision id", string(*in.RelatedDecisionID)); err != nil {
+			return PolicyException{}, err
+		}
 	}
 	return PolicyException{
 		id: in.ID, policySetVersionID: in.PolicySetVersionID, policyID: in.PolicyID,
@@ -109,32 +127,38 @@ func NewPolicyException(in PolicyExceptionInput) (PolicyException, error) {
 	}, nil
 }
 
-func (e PolicyException) ID() PolicyExceptionID { return e.id }
+func (e PolicyException) ID() PolicyExceptionID                  { return e.id }
 func (e PolicyException) PolicySetVersionID() PolicySetVersionID { return e.policySetVersionID }
-func (e PolicyException) PolicyID() PolicyID { return e.policyID }
-func (e PolicyException) PolicyInstanceID() PolicyInstanceID { return e.policyInstanceID }
-func (e PolicyException) EvaluatorVersion() string { return e.evaluatorVersion }
-func (e PolicyException) ConfigurationSchemaVersion() string { return e.configurationSchemaVersion }
-func (e PolicyException) Workflow() PolicyWorkflow { return e.workflow }
-func (e PolicyException) Phase() PolicyPhase { return e.phase }
-func (e PolicyException) Subject() PolicySubject { return e.subject }
+func (e PolicyException) PolicyID() PolicyID                     { return e.policyID }
+func (e PolicyException) PolicyInstanceID() PolicyInstanceID     { return e.policyInstanceID }
+func (e PolicyException) EvaluatorVersion() string               { return e.evaluatorVersion }
+func (e PolicyException) ConfigurationSchemaVersion() string     { return e.configurationSchemaVersion }
+func (e PolicyException) Workflow() PolicyWorkflow               { return e.workflow }
+func (e PolicyException) Phase() PolicyPhase                     { return e.phase }
+func (e PolicyException) Subject() PolicySubject                 { return e.subject }
 func (e PolicyException) ProjectID() ProjectID {
-	if e.subject.Type() != PolicySubjectProject { return "" }
+	if e.subject.Type() != PolicySubjectProject {
+		return ""
+	}
 	return ProjectID(e.subject.ID())
 }
 func (e PolicyException) Deviation() PolicyExceptionDeviation { return e.deviation }
-func (e PolicyException) Actor() Actor { return e.actor }
-func (e PolicyException) Rationale() string { return e.rationale }
-func (e PolicyException) EvidenceIDs() []EvidenceReferenceID { return cloneEvidenceIDs(e.evidenceIDs) }
-func (e PolicyException) CreatedAt() time.Time { return e.createdAt }
-func (e PolicyException) EffectiveAt() time.Time { return e.effectiveAt }
-func (e PolicyException) ExpiresAt() time.Time { return e.expiresAt }
-func (e PolicyException) MaximumUses() int { return e.maximumUses }
-func (e PolicyException) Supersedes() *PolicyExceptionID { return clonePolicyExceptionID(e.supersedes) }
-func (e PolicyException) RelatedDecisionID() *PolicyDecisionID { return cloneExceptionDecisionID(e.relatedDecisionID) }
+func (e PolicyException) Actor() Actor                        { return e.actor }
+func (e PolicyException) Rationale() string                   { return e.rationale }
+func (e PolicyException) EvidenceIDs() []EvidenceReferenceID  { return cloneEvidenceIDs(e.evidenceIDs) }
+func (e PolicyException) CreatedAt() time.Time                { return e.createdAt }
+func (e PolicyException) EffectiveAt() time.Time              { return e.effectiveAt }
+func (e PolicyException) ExpiresAt() time.Time                { return e.expiresAt }
+func (e PolicyException) MaximumUses() int                    { return e.maximumUses }
+func (e PolicyException) Supersedes() *PolicyExceptionID      { return clonePolicyExceptionID(e.supersedes) }
+func (e PolicyException) RelatedDecisionID() *PolicyDecisionID {
+	return cloneExceptionDecisionID(e.relatedDecisionID)
+}
 
 func cloneExceptionDecisionID(id *PolicyDecisionID) *PolicyDecisionID {
-	if id == nil { return nil }
+	if id == nil {
+		return nil
+	}
 	copy := *id
 	return &copy
 }
@@ -142,82 +166,109 @@ func cloneExceptionDecisionID(id *PolicyDecisionID) *PolicyDecisionID {
 // A revocation is a separate immutable maintainer decision. It does not
 // retroactively invalidate an application that was valid when made.
 type PolicyExceptionRevocation struct {
-	id PolicyExceptionRevocationID
+	id          PolicyExceptionRevocationID
 	exceptionID PolicyExceptionID
-	actor Actor
-	rationale string
-	revokedAt time.Time
+	actor       Actor
+	rationale   string
+	revokedAt   time.Time
 }
 
 func NewPolicyExceptionRevocation(id PolicyExceptionRevocationID, exceptionID PolicyExceptionID, actor Actor, rationale string, revokedAt time.Time) (PolicyExceptionRevocation, error) {
-	if err := requireIdentifier("exception revocation id", string(id)); err != nil { return PolicyExceptionRevocation{}, err }
-	if err := requireIdentifier("exception id", string(exceptionID)); err != nil { return PolicyExceptionRevocation{}, err }
-	if !actor.IsMaintainer() { return PolicyExceptionRevocation{}, errMaintainerAuthority("exception revocation") }
-	if err := requireText("revocation rationale", rationale); err != nil { return PolicyExceptionRevocation{}, err }
-	if revokedAt.IsZero() { return PolicyExceptionRevocation{}, errZeroTime("exception revocation time") }
+	if err := requireIdentifier("exception revocation id", string(id)); err != nil {
+		return PolicyExceptionRevocation{}, err
+	}
+	if err := requireIdentifier("exception id", string(exceptionID)); err != nil {
+		return PolicyExceptionRevocation{}, err
+	}
+	if !actor.IsMaintainer() {
+		return PolicyExceptionRevocation{}, errMaintainerAuthority("exception revocation")
+	}
+	if err := requireText("revocation rationale", rationale); err != nil {
+		return PolicyExceptionRevocation{}, err
+	}
+	if revokedAt.IsZero() {
+		return PolicyExceptionRevocation{}, errZeroTime("exception revocation time")
+	}
 	return PolicyExceptionRevocation{id: id, exceptionID: exceptionID, actor: actor, rationale: rationale, revokedAt: revokedAt}, nil
 }
 
 func (r PolicyExceptionRevocation) ID() PolicyExceptionRevocationID { return r.id }
-func (r PolicyExceptionRevocation) ExceptionID() PolicyExceptionID { return r.exceptionID }
-func (r PolicyExceptionRevocation) Actor() Actor { return r.actor }
-func (r PolicyExceptionRevocation) Rationale() string { return r.rationale }
-func (r PolicyExceptionRevocation) RevokedAt() time.Time { return r.revokedAt }
+func (r PolicyExceptionRevocation) ExceptionID() PolicyExceptionID  { return r.exceptionID }
+func (r PolicyExceptionRevocation) Actor() Actor                    { return r.actor }
+func (r PolicyExceptionRevocation) Rationale() string               { return r.rationale }
+func (r PolicyExceptionRevocation) RevokedAt() time.Time            { return r.revokedAt }
 
 // Application is produced only by ValidateAndApplyPolicyException. A retry with
 // the same operation, subject, target decision and actor returns its old record.
 type PolicyExceptionApplication struct {
-	id PolicyExceptionApplicationID
-	exceptionID PolicyExceptionID
-	subject PolicySubject
-	operationID OperationID
+	id               PolicyExceptionApplicationID
+	exceptionID      PolicyExceptionID
+	subject          PolicySubject
+	operationID      OperationID
 	policyDecisionID PolicyDecisionID
-	actor Actor
-	appliedAt time.Time
+	actor            Actor
+	appliedAt        time.Time
 }
+
 func (a PolicyExceptionApplication) ID() PolicyExceptionApplicationID { return a.id }
-func (a PolicyExceptionApplication) ExceptionID() PolicyExceptionID { return a.exceptionID }
-func (a PolicyExceptionApplication) Subject() PolicySubject { return a.subject }
+func (a PolicyExceptionApplication) ExceptionID() PolicyExceptionID   { return a.exceptionID }
+func (a PolicyExceptionApplication) Subject() PolicySubject           { return a.subject }
 func (a PolicyExceptionApplication) ProjectID() ProjectID {
-	if a.subject.Type() != PolicySubjectProject { return "" }
+	if a.subject.Type() != PolicySubjectProject {
+		return ""
+	}
 	return ProjectID(a.subject.ID())
 }
-func (a PolicyExceptionApplication) OperationID() OperationID { return a.operationID }
+func (a PolicyExceptionApplication) OperationID() OperationID           { return a.operationID }
 func (a PolicyExceptionApplication) PolicyDecisionID() PolicyDecisionID { return a.policyDecisionID }
-func (a PolicyExceptionApplication) Actor() Actor { return a.actor }
-func (a PolicyExceptionApplication) AppliedAt() time.Time { return a.appliedAt }
+func (a PolicyExceptionApplication) Actor() Actor                       { return a.actor }
+func (a PolicyExceptionApplication) AppliedAt() time.Time               { return a.appliedAt }
 
 // The application boundary must atomically persist the returned application
 // alongside the operation identity and use the complete retained history.
 // This pure function cannot reserve usage or serialize concurrent writers.
 type PolicyExceptionUseRequest struct {
-	ID PolicyExceptionApplicationID
-	Exception PolicyException
-	PolicySet PolicySetVersion
-	Decision PolicyDecision
-	Actor Actor
-	OperationID OperationID
-	Subject PolicySubject
-	At time.Time
+	ID                PolicyExceptionApplicationID
+	Exception         PolicyException
+	PolicySet         PolicySetVersion
+	Decision          PolicyDecision
+	Actor             Actor
+	OperationID       OperationID
+	Subject           PolicySubject
+	At                time.Time
 	PriorApplications []PolicyExceptionApplication
-	Revocations []PolicyExceptionRevocation
+	Revocations       []PolicyExceptionRevocation
 }
 
 // PolicyExceptionUseError has a stable code so a caller can distinguish
 // invalid history from ordinary ineligibility. Never return partial authority.
-type PolicyExceptionUseError struct { Code string; Detail string }
+type PolicyExceptionUseError struct {
+	Code   string
+	Detail string
+}
+
 func (e *PolicyExceptionUseError) Error() string { return e.Code + ": " + e.Detail }
-func exceptionUseError(code, detail string) error { return &PolicyExceptionUseError{Code:code, Detail:detail} }
+func exceptionUseError(code, detail string) error {
+	return &PolicyExceptionUseError{Code: code, Detail: detail}
+}
 
 func ValidateAndApplyPolicyException(req PolicyExceptionUseRequest) (PolicyExceptionApplication, error) {
 	fail := func(code, detail string) (PolicyExceptionApplication, error) {
 		return PolicyExceptionApplication{}, exceptionUseError(code, detail)
 	}
 	e := req.Exception
-	if err := requireIdentifier("exception application id", string(req.ID)); err != nil { return fail("invalid_request", err.Error()) }
-	if err := requireIdentifier("operation id", string(req.OperationID)); err != nil { return fail("invalid_request", err.Error()) }
-	if req.At.IsZero() || !req.Actor.IsMaintainer() || !req.Subject.valid() { return fail("invalid_request", "time, maintainer actor and typed subject are required") }
-	if e.id == "" || e.policySetVersionID != req.PolicySet.ID() { return fail("policy_mismatch", "unknown exception or different policy set version") }
+	if err := requireIdentifier("exception application id", string(req.ID)); err != nil {
+		return fail("invalid_request", err.Error())
+	}
+	if err := requireIdentifier("operation id", string(req.OperationID)); err != nil {
+		return fail("invalid_request", err.Error())
+	}
+	if req.At.IsZero() || !req.Actor.IsMaintainer() || !req.Subject.valid() {
+		return fail("invalid_request", "time, maintainer actor and typed subject are required")
+	}
+	if e.id == "" || e.policySetVersionID != req.PolicySet.ID() {
+		return fail("policy_mismatch", "unknown exception or different policy set version")
+	}
 
 	var instance *PolicyInstance
 	for _, candidate := range req.PolicySet.Instances() {
@@ -227,7 +278,9 @@ func ValidateAndApplyPolicyException(req PolicyExceptionUseRequest) (PolicyExcep
 			break
 		}
 	}
-	if instance == nil { return fail("policy_mismatch", "exception policy instance is absent") }
+	if instance == nil {
+		return fail("policy_mismatch", "exception policy instance is absent")
+	}
 	p := *instance
 	if p.PolicyID() != e.policyID || p.EvaluatorVersion() != e.evaluatorVersion ||
 		p.ConfigurationSchemaVersion() != e.configurationSchemaVersion ||
@@ -258,8 +311,12 @@ func ValidateAndApplyPolicyException(req PolicyExceptionUseRequest) (PolicyExcep
 		d.Subject() != req.Subject || d.OperationID() != req.OperationID {
 		return fail("decision_mismatch", "exception target is not the exact policy decision/operation")
 	}
-	if d.CreatedAt().After(req.At) || d.CreatedAt().IsZero() { return fail("decision_mismatch", "target decision is after application time") }
-	if e.relatedDecisionID != nil && *e.relatedDecisionID != d.ID() { return fail("decision_mismatch", "exception is bound to a different decision") }
+	if d.CreatedAt().After(req.At) || d.CreatedAt().IsZero() {
+		return fail("decision_mismatch", "target decision is after application time")
+	}
+	if e.relatedDecisionID != nil && *e.relatedDecisionID != d.ID() {
+		return fail("decision_mismatch", "exception is bound to a different decision")
+	}
 	if e.deviation == PolicyExceptionAllowDenial && (d.Result() != PolicyDecisionDeny || p.EffectClass() != PolicyEffectHard) ||
 		e.deviation == PolicyExceptionSatisfyReview && (d.Result() != PolicyDecisionRequireReview || p.EffectClass() != PolicyEffectReviewRequired) ||
 		!e.deviation.Valid() {
@@ -269,8 +326,10 @@ func ValidateAndApplyPolicyException(req PolicyExceptionUseRequest) (PolicyExcep
 	// Validate the entire supplied history in sorted order. Even a future
 	// record must be well-formed; a duplicate operation is not two uses.
 	revocations := append([]PolicyExceptionRevocation(nil), req.Revocations...)
-	sort.Slice(revocations, func(i,j int) bool {
-		if revocations[i].revokedAt.Equal(revocations[j].revokedAt) { return revocations[i].id < revocations[j].id }
+	sort.Slice(revocations, func(i, j int) bool {
+		if revocations[i].revokedAt.Equal(revocations[j].revokedAt) {
+			return revocations[i].id < revocations[j].id
+		}
 		return revocations[i].revokedAt.Before(revocations[j].revokedAt)
 	})
 	revIDs := make(map[PolicyExceptionRevocationID]bool, len(revocations))
@@ -282,8 +341,10 @@ func ValidateAndApplyPolicyException(req PolicyExceptionUseRequest) (PolicyExcep
 		revIDs[r.id] = true
 	}
 	apps := append([]PolicyExceptionApplication(nil), req.PriorApplications...)
-	sort.Slice(apps, func(i,j int) bool {
-		if apps[i].appliedAt.Equal(apps[j].appliedAt) { return apps[i].id < apps[j].id }
+	sort.Slice(apps, func(i, j int) bool {
+		if apps[i].appliedAt.Equal(apps[j].appliedAt) {
+			return apps[i].id < apps[j].id
+		}
 		return apps[i].appliedAt.Before(apps[j].appliedAt)
 	})
 	appIDs := make(map[PolicyExceptionApplicationID]bool, len(apps))
@@ -300,9 +361,13 @@ func ValidateAndApplyPolicyException(req PolicyExceptionUseRequest) (PolicyExcep
 		}
 		appIDs[a.id], operations[a.operationID] = true, true
 		for _, r := range revocations {
-			if !r.revokedAt.After(a.appliedAt) { return fail("invalid_history", "application after exception revocation") }
+			if !r.revokedAt.After(a.appliedAt) {
+				return fail("invalid_history", "application after exception revocation")
+			}
 		}
-		if !a.appliedAt.After(req.At) { used++ }
+		if !a.appliedAt.After(req.At) {
+			used++
+		}
 		if a.operationID == req.OperationID {
 			if a.subject != req.Subject || a.policyDecisionID != d.ID() || a.actor != req.Actor {
 				return fail("idempotency_conflict", "operation was already applied to a different target or actor")
@@ -311,15 +376,25 @@ func ValidateAndApplyPolicyException(req PolicyExceptionUseRequest) (PolicyExcep
 			retry = &copy
 		}
 	}
-	if retry != nil { return *retry, nil }
-	if appIDs[req.ID] { return fail("idempotency_conflict", "application id belongs to another operation") }
-	if req.At.Before(e.effectiveAt) || !req.At.Before(e.expiresAt) { return fail("not_effective", "exception is outside effective interval") }
-	for _, r := range revocations {
-		if !r.revokedAt.After(req.At) { return fail("revoked", "exception was revoked before application") }
+	if retry != nil {
+		return *retry, nil
 	}
-	if used >= e.maximumUses { return fail("uses_exhausted", "exception use limit reached") }
+	if appIDs[req.ID] {
+		return fail("idempotency_conflict", "application id belongs to another operation")
+	}
+	if req.At.Before(e.effectiveAt) || !req.At.Before(e.expiresAt) {
+		return fail("not_effective", "exception is outside effective interval")
+	}
+	for _, r := range revocations {
+		if !r.revokedAt.After(req.At) {
+			return fail("revoked", "exception was revoked before application")
+		}
+	}
+	if used >= e.maximumUses {
+		return fail("uses_exhausted", "exception use limit reached")
+	}
 	return PolicyExceptionApplication{
-		id:req.ID, exceptionID:e.id, subject:req.Subject, operationID:req.OperationID,
-		policyDecisionID:d.ID(), actor:req.Actor, appliedAt:req.At,
+		id: req.ID, exceptionID: e.id, subject: req.Subject, operationID: req.OperationID,
+		policyDecisionID: d.ID(), actor: req.Actor, appliedAt: req.At,
 	}, nil
 }
