@@ -307,6 +307,33 @@ func TestExceptionHistoryDeterminismAndConflict(t *testing.T) {
 	requireExceptionCode(t, func() error { _, err := ValidateAndApplyPolicyException(req); return err }(), "invalid_history")
 }
 
+func TestExceptionRejectsOverusedOrBackdatedHistory(t *testing.T) {
+	req, _ := exceptionFixture(t)
+	first, err := ValidateAndApplyPolicyException(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second := first
+	second.id = "application-2"
+	second.operationID = "operation-2"
+	second.policyDecisionID = "decision-2"
+	second.appliedAt = first.appliedAt.Add(time.Minute)
+	req.PriorApplications = []PolicyExceptionApplication{second, first}
+	requireExceptionCode(t, func() error {
+		_, err := ValidateAndApplyPolicyException(req)
+		return err
+	}(), "invalid_history")
+
+	req.PriorApplications = []PolicyExceptionApplication{first}
+	req.OperationID, req.ID = "operation-3", "application-3"
+	req.Decision.operationID, req.Decision.id = req.OperationID, "decision-3"
+	req.At = first.AppliedAt().Add(-time.Minute)
+	requireExceptionCode(t, func() error {
+		_, err := ValidateAndApplyPolicyException(req)
+		return err
+	}(), "historical_write")
+}
+
 func TestExceptionRevocationAuthorityAndForeignHistory(t *testing.T) {
 	req, _ := exceptionFixture(t)
 	if _, err := NewPolicyExceptionRevocation("rev-1", req.Exception.ID(), Actor{}, "invalid", req.At); err == nil {
