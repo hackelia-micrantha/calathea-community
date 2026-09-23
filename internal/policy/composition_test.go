@@ -306,3 +306,105 @@ func TestComposeBaselineRejectsFutureAndMissingTime(t *testing.T) {
 	_, err = ComposeBaseline(req)
 	requireCompositionFailure(t, err, "incoherent_decision")
 }
+
+func TestComposeBaselineEqualPriorityUsesPolicyIdentityWithinPhase(t *testing.T) {
+	instances := baselineInstances(t)
+	original := instances[1]
+	instances[1] = mustPolicyInstance(t, domain.PolicyInstanceInput{
+		ID: original.ID(),
+		PolicyID: original.PolicyID(),
+		EvaluatorType: original.EvaluatorType(),
+		EvaluatorVersion: original.EvaluatorVersion(),
+		Phase: original.Phase(),
+		EffectClass: original.EffectClass(),
+		SubjectType: original.SubjectType(),
+		RequiredInputs: original.RequiredInputs(),
+		MissingInputBehavior: original.MissingInputBehavior(),
+		Priority: instances[0].Priority(),
+		Exceptionability: original.Exceptionability(),
+		Parameters: original.Parameters(),
+		Rationale: original.Rationale(),
+	})
+	set, err := domain.NewPolicySetVersion("set-v1", "set", policyTestTime(), instances...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateForActivation(set); err != nil {
+		t.Fatal(err)
+	}
+	state := domain.LifecycleApproved
+	evaluation := testEvaluation(t, 9000, policyTestTime())
+	req := ComposeBaselineRequest{PolicySet: set, OperationID: "op-1", Subject: projectSubject(t)}
+	for _, instance := range set.Instances() {
+		r := request(t, set, instance.ID(), req.Subject)
+		r.DecisionID = domain.PolicyDecisionID("decision-" + string(instance.ID()))
+		r.Context.LifecycleState = &state
+		r.Context.Evaluation = &evaluation
+		r.Context.AsOf = policyTestTime()
+		d, err := Evaluate(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Decisions = append(req.Decisions, d)
+	}
+	steps := mustCompose(t, req).Steps()
+	if steps[0].PolicyID != PolicyRequiredEvaluation || steps[1].PolicyID != PolicyLifecycleEligibility {
+		t.Fatalf("equal-priority phase decisions not ordered by policy identity: %#v", steps[:2])
+	}
+}
+
+func TestComposeBaselineCapacityDenialDoesNotRelaxConstraint(t *testing.T) {
+	set := baselinePolicySet(t)
+	subject := placementSubject(t, domain.PlacementNow)
+	count := 4
+	req := ComposeBaselineRequest{PolicySet: set, OperationID: "op-1", Subject: subject}
+	for _, instance := range set.Instances() {
+		r := request(t, set, instance.ID(), subject)
+		r.DecisionID = domain.PolicyDecisionID("decision-" + string(instance.ID()))
+		r.Context.SelectedCount = &count
+		d, err := Evaluate(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Decisions = append(req.Decisions, d)
+	}
+	out := mustCompose(t, req)
+	if out.Outcome() != CompositionDenied || len(out.Steps()) != len(set.Instances()) {
+		t.Fatalf("over-capacity outcome=%q, trace=%#v", out.Outcome(), out.Steps())
+	}
+}
+
+func TestComposeBaselineRejectsForeignInstanceAndNonApplicableWithInputs(t *testing.T) {
+	state := domain.LifecycleApproved
+	evaluation := testEvaluation(t, 9000, policyTestTime())
+	base := baselineComposeFixture(t, projectSubject(t), &state, &evaluation)
+	foreign := base
+	foreign.Decisions = append([]domain.PolicyDecision(nil), base.Decisions...)
+	bad := decisionInputFrom(foreign.Decisions[0])
+	bad.PolicyInstanceID = "foreign-instance"
+	foreign.Decisions[0], _ = domain.NewPolicyDecision(bad)
+	_, err := ComposeBaseline(foreign)
+	requireCompositionFailure(t, err, "foreign_decision")
+
+	withInputs := base
+	withInputs.Decisions = append([]domain.PolicyDecision(nil), base.Decisions...)
+	for i, original := range withInputs.Decisions {
+		if original.Result() != domain.PolicyDecisionNotApplicable {
+			continue
+		}
+		input := decisionInputFrom(original)
+		ref, refErr := domain.NewPolicyInputReference(input.RequiredInputs[0], "fabricated")
+		if refErr != nil {
+			t.Fatal(refErr)
+		}
+		input.InputReferences = []domain.PolicyInputReference{ref}
+		changed, constructionErr := domain.NewPolicyDecision(input)
+		if constructionErr != nil {
+			t.Fatal(constructionErr)
+		}
+		withInputs.Decisions[i] = changed
+		break
+	}
+	_, err = ComposeBaseline(withInputs)
+	requireCompositionFailure(t, err, "incoherent_decision")
+}
