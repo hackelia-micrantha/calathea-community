@@ -37,6 +37,9 @@ jobs:
       - name: Verify formatting
         run: nix develop --command mise run format-check
 
+      - name: SQLite persistence spike (CGO disabled)
+        run: nix develop --command mise run sqlite-spike
+
       - name: Static analysis
         run: nix develop --command mise run static
 
