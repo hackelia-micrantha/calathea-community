@@ -197,7 +197,13 @@ func TestComposeBaselineRejectsIncompleteDuplicateAndForeignDecisions(t *testing
 		code string
 	}{
 		{"missing",func(r *ComposeBaselineRequest){r.Decisions=r.Decisions[1:]},"incomplete_decisions"},
-		{"duplicate instance",func(r *ComposeBaselineRequest){r.Decisions[1]=r.Decisions[0]},"duplicate_instance_decision"},
+		{"duplicate instance",func(r *ComposeBaselineRequest){
+			replacement:=decisionInputFrom(r.Decisions[0])
+			replacement.ID="second-decision-for-same-instance"
+			d,err:=domain.NewPolicyDecision(replacement)
+			if err!=nil {t.Fatal(err)}
+			r.Decisions[1]=d
+		},"duplicate_instance_decision"},
 		{"wrong operation",func(r *ComposeBaselineRequest){r.OperationID="other"},"incoherent_decision"},
 		{"wrong subject",func(r *ComposeBaselineRequest){r.Subject=projectSubjectFor(t,"other-project")},"incoherent_decision"},
 		{"wrong policy set",func(r *ComposeBaselineRequest){
