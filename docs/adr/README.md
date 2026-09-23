@@ -24,8 +24,11 @@ A private Calathea product requirement may motivate a public ADR, but the ADR sh
 | [0003 — Optional Adapter Boundaries](0003_optional_integration_boundaries.md) | Accepted | Generic optional-adapter architecture; no mandatory provider/governance/effect dependency |
 | [0004 — Go Runtime for Calathea v0](0004_go_runtime.md) | Accepted | Go runtime and single local executable for this public implementation |
 | [0005 — Public Go Module and Process Boundary](0005_public_go_process_boundary.md) | Accepted | Public module identity, `internal/` encapsulation, process/schema integration surface |
+| [0006 — SQLite v0 Local Persistence](0006_sqlite_v0_local_persistence.md) | Proposed | Physical local persistence hypothesis pending executable spike evidence from #38 / PR #39 |
 
 ADR 0005 amends ADR 0004 only where repository/module identity changed during the public-core extraction. It does not supersede the Go runtime choice.
+
+ADR 0006 remains proposed until its executable spike validates transaction/idempotency, migration, backup/restore, integrity, CGO-free packaging, and dependency/toolchain assumptions. Do not treat the index entry as technology acceptance before that evidence is reviewed.
 
 ## ADR rules
 
