@@ -270,6 +270,9 @@ func TestExceptionBindingRejectsMismatches(t *testing.T) {
 			r.Exception.relatedDecisionID = &id
 		}, "decision_mismatch"},
 		{"wrong operation", func(r *PolicyExceptionUseRequest) { r.Decision.operationID = "other" }, "decision_mismatch"},
+		{"wrong decision evaluator", func(r *PolicyExceptionUseRequest) { r.Decision.evaluatorType = PolicyEvaluatorFreshnessRule }, "decision_mismatch"},
+		{"wrong decision effect class", func(r *PolicyExceptionUseRequest) { r.Decision.effectClass = PolicyEffectHard }, "decision_mismatch"},
+		{"wrong decision missing-input semantics", func(r *PolicyExceptionUseRequest) { r.Decision.missingInputBehavior = PolicyMissingInputDeny }, "decision_mismatch"},
 		{"wrong deviation", func(r *PolicyExceptionUseRequest) { r.Exception.deviation = PolicyExceptionAllowDenial }, "deviation_mismatch"},
 		{"constraints unsupported", func(r *PolicyExceptionUseRequest) {
 			p := r.PolicySet.instances[0]
