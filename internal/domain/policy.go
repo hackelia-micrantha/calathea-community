@@ -376,6 +376,12 @@ func ValidateAndApplyPolicyException(req PolicyExceptionUseRequest) (PolicyExcep
 			retry = &copy
 		}
 	}
+	if len(apps) > e.maximumUses {
+		return fail("invalid_history", "retained applications exceed the exception use limit")
+	}
+	if retry == nil && len(apps) > 0 && req.At.Before(apps[len(apps)-1].appliedAt) {
+		return fail("historical_write", "new application predates an existing use")
+	}
 	if retry != nil {
 		if req.At.Before(retry.appliedAt) {
 			return fail("idempotency_conflict", "retry time precedes the recorded application")
