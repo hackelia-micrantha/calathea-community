@@ -377,6 +377,9 @@ func ValidateAndApplyPolicyException(req PolicyExceptionUseRequest) (PolicyExcep
 		}
 	}
 	if retry != nil {
+		if req.At.Before(retry.appliedAt) {
+			return fail("idempotency_conflict", "retry time precedes the recorded application")
+		}
 		return *retry, nil
 	}
 	if appIDs[req.ID] {
