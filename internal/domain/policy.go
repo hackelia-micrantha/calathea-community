@@ -306,6 +306,8 @@ func ValidateAndApplyPolicyException(req PolicyExceptionUseRequest) (PolicyExcep
 	d := req.Decision
 	if d.ID() == "" || d.PolicySetVersionID() != e.policySetVersionID ||
 		d.PolicyID() != e.policyID || d.PolicyInstanceID() != e.policyInstanceID ||
+		d.EvaluatorType() != p.EvaluatorType() || d.EffectClass() != p.EffectClass() ||
+		d.MissingInputBehavior() != p.MissingInputBehavior() ||
 		d.EvaluatorVersion() != e.evaluatorVersion || d.ConfigurationSchemaVersion() != e.configurationSchemaVersion ||
 		d.Workflow() != e.workflow || d.Phase() != e.phase ||
 		d.Subject() != req.Subject || d.OperationID() != req.OperationID {
