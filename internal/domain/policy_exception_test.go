@@ -263,7 +263,11 @@ func TestExceptionBindingRejectsMismatches(t *testing.T) {
 		{"wrong schema", func(r *PolicyExceptionUseRequest) { r.Exception.configurationSchemaVersion = "2" }, "policy_mismatch"},
 		{"wrong workflow", func(r *PolicyExceptionUseRequest) { r.Exception.workflow = "other" }, "policy_mismatch"},
 		{"wrong phase", func(r *PolicyExceptionUseRequest) { r.Exception.phase = PolicyPhaseSetConstraints }, "policy_mismatch"},
-		{"different decision", func(r *PolicyExceptionUseRequest) { r.Decision.id = "other"; id := PolicyDecisionID("decision-1"); r.Exception.relatedDecisionID = &id }, "decision_mismatch"},
+		{"different decision", func(r *PolicyExceptionUseRequest) {
+			r.Decision.id = "other"
+			id := PolicyDecisionID("decision-1")
+			r.Exception.relatedDecisionID = &id
+		}, "decision_mismatch"},
 		{"wrong operation", func(r *PolicyExceptionUseRequest) { r.Decision.operationID = "other" }, "decision_mismatch"},
 		{"wrong deviation", func(r *PolicyExceptionUseRequest) { r.Exception.deviation = PolicyExceptionAllowDenial }, "deviation_mismatch"},
 		{"constraints unsupported", func(r *PolicyExceptionUseRequest) {
