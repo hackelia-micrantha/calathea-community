@@ -311,19 +311,19 @@ func TestComposeBaselineEqualPriorityUsesPolicyIdentityWithinPhase(t *testing.T)
 	instances := baselineInstances(t)
 	original := instances[1]
 	instances[1] = mustPolicyInstance(t, domain.PolicyInstanceInput{
-		ID: original.ID(),
-		PolicyID: original.PolicyID(),
-		EvaluatorType: original.EvaluatorType(),
-		EvaluatorVersion: original.EvaluatorVersion(),
-		Phase: original.Phase(),
-		EffectClass: original.EffectClass(),
-		SubjectType: original.SubjectType(),
-		RequiredInputs: original.RequiredInputs(),
+		ID:                   original.ID(),
+		PolicyID:             original.PolicyID(),
+		EvaluatorType:        original.EvaluatorType(),
+		EvaluatorVersion:     original.EvaluatorVersion(),
+		Phase:                original.Phase(),
+		EffectClass:          original.EffectClass(),
+		SubjectType:          original.SubjectType(),
+		RequiredInputs:       original.RequiredInputs(),
 		MissingInputBehavior: original.MissingInputBehavior(),
-		Priority: instances[0].Priority(),
-		Exceptionability: original.Exceptionability(),
-		Parameters: original.Parameters(),
-		Rationale: original.Rationale(),
+		Priority:             instances[0].Priority(),
+		Exceptionability:     original.Exceptionability(),
+		Parameters:           original.Parameters(),
+		Rationale:            original.Rationale(),
 	})
 	set, err := domain.NewPolicySetVersion("set-v1", "set", policyTestTime(), instances...)
 	if err != nil {
