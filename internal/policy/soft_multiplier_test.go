@@ -139,6 +139,41 @@ func TestScoreMultipliersComposeExactlyAndIndependentlyOfCallerOrder(t *testing.
 	}
 }
 
+func TestSingleScoreMultiplierProducesExactFactor(t *testing.T) {
+	set := softPolicySet(t, 5000, 20000, 12500)
+	_, out := composeProjectForSet(t, set, domain.LifecycleApproved, 9000)
+	if got := out.ScoreMultiplier().String(); got != "5/4" {
+		t.Fatalf("single multiplier = %q, want 5/4", got)
+	}
+}
+
+func TestScoreMultiplierPerEffectBoundsRejectActivation(t *testing.T) {
+	contract, err := domain.NewScoreMultiplierContract(
+		domain.PolicySoftCombinatorMultiplyV1,
+		9000,
+		11000,
+		5000,
+		20000,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instances := append(baselineInstances(t), scoreMultiplierInstance(t, "score-a", "orientation.score.a", 12500, 45))
+	set, err := domain.NewPolicySetVersionWithScoreMultiplierContract(
+		"set-bad-per-effect",
+		"policy-set",
+		policyTestTime(),
+		contract,
+		instances...,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateForActivation(set); err == nil {
+		t.Fatal("factor outside explicit per-effect bounds activated")
+	}
+}
+
 func TestScoreMultiplierCumulativeBoundsFailClosed(t *testing.T) {
 	set := softPolicySet(t, 5000, 11000, 12000)
 	if err := ValidateForActivation(set); err != nil {
