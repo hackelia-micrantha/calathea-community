@@ -5,6 +5,7 @@ package policy
 
 import (
 	"fmt"
+	"math/big"
 	"sort"
 
 	"github.com/hackelia-micrantha/calathea-community/internal/domain"
@@ -27,14 +28,19 @@ const (
 // contribution in stable phase/priority/policy/instance order. The full
 // PolicyDecision remains the source of truth for effects and input evidence.
 type CompositionStep struct {
-	DecisionID     domain.PolicyDecisionID
-	PolicyID       domain.PolicyID
-	InstanceID     domain.PolicyInstanceID
-	Phase          domain.PolicyPhase
-	Priority       int
-	Result         domain.PolicyDecisionResult
-	Interpretation string
-	ReasonCode     string
+	DecisionID                    domain.PolicyDecisionID
+	PolicyID                      domain.PolicyID
+	InstanceID                    domain.PolicyInstanceID
+	Phase                         domain.PolicyPhase
+	Priority                      int
+	Result                        domain.PolicyDecisionResult
+	Interpretation                string
+	ReasonCode                    string
+	ScoreMultiplierBefore         string
+	ScoreMultiplierFactor         string
+	ScoreMultiplierProposedAfter  string
+	ScoreMultiplierEffectiveAfter string
+	SuppressedByHardPolicy        bool
 }
 
 // Composition returns a deterministic subject-level summary without rewriting
@@ -44,6 +50,7 @@ type Composition struct {
 	operationID        domain.OperationID
 	subject            domain.PolicySubject
 	outcome            CompositionOutcome
+	scoreMultiplier    ExactMultiplier
 	steps              []CompositionStep
 }
 
@@ -51,6 +58,12 @@ func (c Composition) PolicySetVersionID() domain.PolicySetVersionID { return c.p
 func (c Composition) OperationID() domain.OperationID               { return c.operationID }
 func (c Composition) Subject() domain.PolicySubject                 { return c.subject }
 func (c Composition) Outcome() CompositionOutcome                   { return c.outcome }
+func (c Composition) ScoreMultiplier() ExactMultiplier {
+	if !c.scoreMultiplier.valid() {
+		return ExactMultiplier{}
+	}
+	return ExactMultiplier{value: new(big.Rat).Set(c.scoreMultiplier.value)}
+}
 func (c Composition) Steps() []CompositionStep {
 	return append([]CompositionStep(nil), c.steps...)
 }
@@ -128,6 +141,7 @@ func ComposeBaseline(req ComposeBaselineRequest) (Composition, error) {
 	}
 	steps := make([]CompositionStep, 0, len(instances))
 	var hasHardAllow, hasDeny, hasExclude, hasReview, hasFailure bool
+	proposedMultiplier := neutralMultiplier()
 	for _, instance := range instances {
 		decision, exists := byDecisionInstance[instance.ID()]
 		if !exists {
@@ -149,32 +163,81 @@ func ComposeBaseline(req ComposeBaselineRequest) (Composition, error) {
 		case "missing_input_fail_operation":
 			hasFailure = true
 		}
-		steps = append(steps, CompositionStep{
+		step := CompositionStep{
 			DecisionID: decision.ID(), PolicyID: instance.PolicyID(),
 			InstanceID: instance.ID(), Phase: instance.Phase(),
 			Priority: instance.Priority(), Result: decision.Result(),
 			Interpretation: interpretation, ReasonCode: decision.ReasonCode(),
-		})
+		}
+		if interpretation == "soft_score_multiplier" {
+			effects := decision.Effects()
+			factorBPS, ok := effects[0].ScoreMultiplierBasisPoints()
+			if !ok {
+				return fail("invalid_soft_effect", "score multiplier effect is missing its factor")
+			}
+			factor, err := multiplierFromBasisPoints(factorBPS)
+			if err != nil {
+				return fail("invalid_soft_effect", err.Error())
+			}
+			before := proposedMultiplier
+			after, err := proposedMultiplier.multiply(factor)
+			if err != nil {
+				return fail("invalid_soft_effect", err.Error())
+			}
+			contract, ok := req.PolicySet.ScoreMultiplierContract()
+			if !ok {
+				return fail("invalid_policy_set", "score multiplier decision has no composition contract")
+			}
+			lowCmp, _ := after.compareBasisPoints(contract.CumulativeMinBasisPoints())
+			highCmp, _ := after.compareBasisPoints(contract.CumulativeMaxBasisPoints())
+			if lowCmp < 0 || highCmp > 0 {
+				return fail("soft_effect_bounds", "cumulative score multiplier is outside declared policy-set bounds")
+			}
+			step.ScoreMultiplierBefore = before.String()
+			step.ScoreMultiplierFactor = factor.String()
+			step.ScoreMultiplierProposedAfter = after.String()
+			proposedMultiplier = after
+		}
+		steps = append(steps, step)
 	}
 	// Failure takes precedence over denial, denial over exclusion, exclusion
 	// over review, review over an otherwise passing hard policy. These
 	// diagnostic categories never let a later allow cancel an earlier block.
 	outcome := CompositionNotApplicable
+	blockSoft := false
 	switch {
 	case hasFailure:
 		outcome = CompositionFailed
+		blockSoft = true
 	case hasDeny:
 		outcome = CompositionDenied
+		blockSoft = true
 	case hasExclude:
 		outcome = CompositionExcluded
+		blockSoft = true
 	case hasReview:
 		outcome = CompositionReviewNeeded
 	case hasHardAllow:
 		outcome = CompositionAllowed
 	}
+	effectiveMultiplier := proposedMultiplier
+	if blockSoft {
+		effectiveMultiplier = neutralMultiplier()
+	}
+	for i := range steps {
+		if steps[i].Interpretation != "soft_score_multiplier" {
+			continue
+		}
+		steps[i].SuppressedByHardPolicy = blockSoft
+		if blockSoft {
+			steps[i].ScoreMultiplierEffectiveAfter = neutralMultiplier().String()
+		} else {
+			steps[i].ScoreMultiplierEffectiveAfter = steps[i].ScoreMultiplierProposedAfter
+		}
+	}
 	return Composition{
 		policySetVersionID: req.PolicySet.ID(), operationID: req.OperationID,
-		subject: req.Subject, outcome: outcome, steps: steps,
+		subject: req.Subject, outcome: outcome, scoreMultiplier: effectiveMultiplier, steps: steps,
 	}, nil
 }
 
@@ -236,9 +299,6 @@ func validateComposedDecision(req ComposeBaselineRequest, instance domain.Policy
 	} else if len(missing) != 0 {
 		return fmt.Errorf("non-indeterminate decision reports missing input")
 	}
-	if instance.EffectClass() == domain.PolicyEffectSoft {
-		return fmt.Errorf("no v0 soft evaluator/combinator contract is activated")
-	}
 	switch d.Result() {
 	case domain.PolicyDecisionAllow, domain.PolicyDecisionDeny:
 		if d.Result() == domain.PolicyDecisionDeny && instance.EffectClass() != domain.PolicyEffectHard {
@@ -266,6 +326,20 @@ func validateComposedDecision(req ComposeBaselineRequest, instance domain.Policy
 			effects[0].Type() != domain.PolicyEffectRequireReview || effects[0].Code() != d.ReasonCode() {
 			return fmt.Errorf("review requirement must retain its matching typed effect")
 		}
+	case domain.PolicyDecisionAdjust:
+		effects := d.Effects()
+		if instance.EvaluatorType() != domain.PolicyEvaluatorScoreMultiplier ||
+			instance.EffectClass() != domain.PolicyEffectSoft || len(effects) != 1 ||
+			effects[0].Type() != domain.PolicyEffectScoreMultiplier {
+			return fmt.Errorf("adjust decision requires the configured score multiplier effect")
+		}
+		factor, ok := effects[0].ScoreMultiplierBasisPoints()
+		expected, haveExpected := instance.Parameters().ScoreMultiplierBasisPoints()
+		contract, haveContract := req.PolicySet.ScoreMultiplierContract()
+		if !ok || !haveExpected || !haveContract || factor != expected ||
+			factor < contract.PerEffectMinBasisPoints() || factor > contract.PerEffectMaxBasisPoints() {
+			return fmt.Errorf("score multiplier effect differs from policy instance/contract")
+		}
 	case domain.PolicyDecisionIndeterminate:
 		// Missing-input interpretation occurs below, not as an evaluator failure.
 	default:
@@ -290,6 +364,12 @@ func interpretBaselineDecision(instance domain.PolicyInstance, d domain.PolicyDe
 		return "hard_deny", nil
 	case domain.PolicyDecisionRequireReview:
 		return "review_required", nil
+	case domain.PolicyDecisionAdjust:
+		if instance.EffectClass() == domain.PolicyEffectSoft &&
+			instance.EvaluatorType() == domain.PolicyEvaluatorScoreMultiplier {
+			return "soft_score_multiplier", nil
+		}
+		return "", fmt.Errorf("unsupported adjust effect")
 	case domain.PolicyDecisionIndeterminate:
 		switch d.MissingInputBehavior() {
 		case domain.PolicyMissingInputDeny:
