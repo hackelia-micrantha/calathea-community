@@ -128,8 +128,8 @@ var baselineSpecs = map[domain.PolicyID]baselineSpec{
 }
 
 // ValidateForActivation proves that a PolicySetVersion contains exactly one
-// correctly wired instance of every UC-01 baseline policy. It does not perform
-// multi-policy composition; that is a separate policy-engine slice.
+// correctly wired instance of every UC-01 baseline policy plus only supported
+// explicitly contracted optional policies. It does not perform runtime composition.
 func ValidateForActivation(version domain.PolicySetVersion) error {
 	if strings.TrimSpace(string(version.ID())) == "" {
 		return errors.New("policy set version id must not be empty")
