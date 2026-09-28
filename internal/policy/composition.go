@@ -188,8 +188,14 @@ func ComposeBaseline(req ComposeBaselineRequest) (Composition, error) {
 			if !ok {
 				return fail("invalid_policy_set", "score multiplier decision has no composition contract")
 			}
-			lowCmp, _ := after.compareBasisPoints(contract.CumulativeMinBasisPoints())
-			highCmp, _ := after.compareBasisPoints(contract.CumulativeMaxBasisPoints())
+			lowCmp, err := after.compareBasisPoints(contract.CumulativeMinBasisPoints())
+			if err != nil {
+				return fail("invalid_soft_effect", err.Error())
+			}
+			highCmp, err := after.compareBasisPoints(contract.CumulativeMaxBasisPoints())
+			if err != nil {
+				return fail("invalid_soft_effect", err.Error())
+			}
 			if lowCmp < 0 || highCmp > 0 {
 				return fail("soft_effect_bounds", "cumulative score multiplier is outside declared policy-set bounds")
 			}
