@@ -14,6 +14,7 @@ const (
 	PolicyEvaluatorCapacityLimit        PolicyEvaluatorType = "capacity_limit"
 	PolicyEvaluatorConfidenceGate       PolicyEvaluatorType = "confidence_gate"
 	PolicyEvaluatorFreshnessRule        PolicyEvaluatorType = "freshness_rule"
+	PolicyEvaluatorScoreMultiplier      PolicyEvaluatorType = "score_multiplier"
 )
 
 func (t PolicyEvaluatorType) Valid() bool {
@@ -22,7 +23,8 @@ func (t PolicyEvaluatorType) Valid() bool {
 		PolicyEvaluatorRequiredEvaluation,
 		PolicyEvaluatorCapacityLimit,
 		PolicyEvaluatorConfidenceGate,
-		PolicyEvaluatorFreshnessRule:
+		PolicyEvaluatorFreshnessRule,
+		PolicyEvaluatorScoreMultiplier:
 		return true
 	default:
 		return false
@@ -147,11 +149,12 @@ func (k PolicyInputKind) Valid() bool {
 // New evaluator parameters require an explicit domain/schema change rather than
 // an untyped map or executable expression.
 type PolicyParameters struct {
-	placement                *Placement
-	maximum                  *int
-	allowProposed            *bool
-	confidenceReviewBelowBPS *int
-	freshnessMaxAgeDays      *int
+	placement                  *Placement
+	maximum                    *int
+	allowProposed              *bool
+	confidenceReviewBelowBPS   *int
+	freshnessMaxAgeDays        *int
+	scoreMultiplierBasisPoints *int
 }
 
 func NewNoPolicyParameters() PolicyParameters { return PolicyParameters{} }
@@ -182,6 +185,13 @@ func NewFreshnessRuleParameters(maxAgeDays int) (PolicyParameters, error) {
 		return PolicyParameters{}, fmt.Errorf("freshness maximum age %d must not be negative", maxAgeDays)
 	}
 	return PolicyParameters{freshnessMaxAgeDays: cloneInt(&maxAgeDays)}, nil
+}
+
+func NewScoreMultiplierParameters(factorBasisPoints int) (PolicyParameters, error) {
+	if factorBasisPoints <= 0 {
+		return PolicyParameters{}, fmt.Errorf("score multiplier factor %d must be positive", factorBasisPoints)
+	}
+	return PolicyParameters{scoreMultiplierBasisPoints: cloneInt(&factorBasisPoints)}, nil
 }
 
 func (p PolicyParameters) Placement() (Placement, bool) {
@@ -219,13 +229,21 @@ func (p PolicyParameters) FreshnessMaxAgeDays() (int, bool) {
 	return *p.freshnessMaxAgeDays, true
 }
 
+func (p PolicyParameters) ScoreMultiplierBasisPoints() (int, bool) {
+	if p.scoreMultiplierBasisPoints == nil {
+		return 0, false
+	}
+	return *p.scoreMultiplierBasisPoints, true
+}
+
 func (p PolicyParameters) clone() PolicyParameters {
 	return PolicyParameters{
-		placement:                clonePlacement(p.placement),
-		maximum:                  cloneInt(p.maximum),
-		allowProposed:            cloneBool(p.allowProposed),
-		confidenceReviewBelowBPS: cloneInt(p.confidenceReviewBelowBPS),
-		freshnessMaxAgeDays:      cloneInt(p.freshnessMaxAgeDays),
+		placement:                  clonePlacement(p.placement),
+		maximum:                    cloneInt(p.maximum),
+		allowProposed:              cloneBool(p.allowProposed),
+		confidenceReviewBelowBPS:   cloneInt(p.confidenceReviewBelowBPS),
+		freshnessMaxAgeDays:        cloneInt(p.freshnessMaxAgeDays),
+		scoreMultiplierBasisPoints: cloneInt(p.scoreMultiplierBasisPoints),
 	}
 }
 
@@ -339,36 +357,44 @@ func validatePolicyParameters(evaluator PolicyEvaluatorType, parameters PolicyPa
 	_, hasAllowProposed := parameters.AllowProposed()
 	confidenceThreshold, hasConfidence := parameters.ConfidenceReviewBelowBasisPoints()
 	freshnessDays, hasFreshness := parameters.FreshnessMaxAgeDays()
+	scoreMultiplier, hasScoreMultiplier := parameters.ScoreMultiplierBasisPoints()
 
 	switch evaluator {
 	case PolicyEvaluatorLifecycleEligibility:
-		if !hasAllowProposed || hasPlacement || hasMaximum || hasConfidence || hasFreshness {
+		if !hasAllowProposed || hasPlacement || hasMaximum || hasConfidence || hasFreshness || hasScoreMultiplier {
 			return fmt.Errorf("lifecycle eligibility policy has invalid parameter shape")
 		}
 	case PolicyEvaluatorRequiredEvaluation:
-		if hasAllowProposed || hasPlacement || hasMaximum || hasConfidence || hasFreshness {
+		if hasAllowProposed || hasPlacement || hasMaximum || hasConfidence || hasFreshness || hasScoreMultiplier {
 			return fmt.Errorf("required evaluation policy does not accept parameters")
 		}
 	case PolicyEvaluatorCapacityLimit:
-		if !hasPlacement || !hasMaximum || hasAllowProposed || hasConfidence || hasFreshness {
+		if !hasPlacement || !hasMaximum || hasAllowProposed || hasConfidence || hasFreshness || hasScoreMultiplier {
 			return fmt.Errorf("capacity policy requires only placement and maximum parameters")
 		}
 		if !placement.Valid() || placement == PlacementKill || maximum < 0 {
 			return fmt.Errorf("capacity policy parameters are invalid")
 		}
 	case PolicyEvaluatorConfidenceGate:
-		if !hasConfidence || hasAllowProposed || hasPlacement || hasMaximum || hasFreshness {
+		if !hasConfidence || hasAllowProposed || hasPlacement || hasMaximum || hasFreshness || hasScoreMultiplier {
 			return fmt.Errorf("confidence gate requires only a confidence threshold")
 		}
 		if confidenceThreshold < 0 || confidenceThreshold > 10000 {
 			return fmt.Errorf("confidence review threshold %d is outside 0-10000", confidenceThreshold)
 		}
 	case PolicyEvaluatorFreshnessRule:
-		if !hasFreshness || hasAllowProposed || hasPlacement || hasMaximum || hasConfidence {
+		if !hasFreshness || hasAllowProposed || hasPlacement || hasMaximum || hasConfidence || hasScoreMultiplier {
 			return fmt.Errorf("freshness rule requires only maximum age days")
 		}
 		if freshnessDays < 0 {
 			return fmt.Errorf("freshness maximum age %d must not be negative", freshnessDays)
+		}
+	case PolicyEvaluatorScoreMultiplier:
+		if !hasScoreMultiplier || hasAllowProposed || hasPlacement || hasMaximum || hasConfidence || hasFreshness {
+			return fmt.Errorf("score multiplier policy requires only an explicit factor")
+		}
+		if scoreMultiplier <= 0 {
+			return fmt.Errorf("score multiplier factor %d must be positive", scoreMultiplier)
 		}
 	default:
 		return fmt.Errorf("unsupported policy evaluator type %q", evaluator)
@@ -432,14 +458,15 @@ func (s PolicySubject) valid() bool {
 type PolicyEffectType string
 
 const (
-	PolicyEffectCapacityLimit PolicyEffectType = "capacity_limit"
-	PolicyEffectRequireReview PolicyEffectType = "require_review"
-	PolicyEffectDiagnostic    PolicyEffectType = "diagnostic"
+	PolicyEffectCapacityLimit   PolicyEffectType = "capacity_limit"
+	PolicyEffectRequireReview   PolicyEffectType = "require_review"
+	PolicyEffectDiagnostic      PolicyEffectType = "diagnostic"
+	PolicyEffectScoreMultiplier PolicyEffectType = "score_multiplier"
 )
 
 func (t PolicyEffectType) Valid() bool {
 	switch t {
-	case PolicyEffectCapacityLimit, PolicyEffectRequireReview, PolicyEffectDiagnostic:
+	case PolicyEffectCapacityLimit, PolicyEffectRequireReview, PolicyEffectDiagnostic, PolicyEffectScoreMultiplier:
 		return true
 	default:
 		return false
@@ -448,10 +475,11 @@ func (t PolicyEffectType) Valid() bool {
 
 // PolicyEffect is a closed structured effect descriptor retained in PolicyDecision.
 type PolicyEffect struct {
-	typeName  PolicyEffectType
-	placement *Placement
-	maximum   *int
-	code      string
+	typeName          PolicyEffectType
+	placement         *Placement
+	maximum           *int
+	factorBasisPoints *int
+	code              string
 }
 
 func NewCapacityPolicyEffect(placement Placement, maximum int) (PolicyEffect, error) {
@@ -478,6 +506,13 @@ func NewDiagnosticPolicyEffect(code string) (PolicyEffect, error) {
 	return PolicyEffect{typeName: PolicyEffectDiagnostic, code: code}, nil
 }
 
+func NewScoreMultiplierPolicyEffect(factorBasisPoints int) (PolicyEffect, error) {
+	if factorBasisPoints <= 0 {
+		return PolicyEffect{}, fmt.Errorf("score multiplier factor %d must be positive", factorBasisPoints)
+	}
+	return PolicyEffect{typeName: PolicyEffectScoreMultiplier, factorBasisPoints: cloneInt(&factorBasisPoints)}, nil
+}
+
 func (e PolicyEffect) Type() PolicyEffectType { return e.typeName }
 func (e PolicyEffect) Placement() (Placement, bool) {
 	if e.placement == nil {
@@ -492,15 +527,24 @@ func (e PolicyEffect) Maximum() (int, bool) {
 	return *e.maximum, true
 }
 func (e PolicyEffect) Code() string { return e.code }
+func (e PolicyEffect) ScoreMultiplierBasisPoints() (int, bool) {
+	if e.factorBasisPoints == nil {
+		return 0, false
+	}
+	return *e.factorBasisPoints, true
+}
 
 func (e PolicyEffect) valid() bool {
 	switch e.typeName {
 	case PolicyEffectCapacityLimit:
 		placement, hasPlacement := e.Placement()
 		maximum, hasMaximum := e.Maximum()
-		return hasPlacement && hasMaximum && placement.Valid() && placement != PlacementKill && maximum >= 0 && e.code == ""
+		return hasPlacement && hasMaximum && placement.Valid() && placement != PlacementKill && maximum >= 0 && e.factorBasisPoints == nil && e.code == ""
 	case PolicyEffectRequireReview, PolicyEffectDiagnostic:
-		return e.placement == nil && e.maximum == nil && requireText("policy effect code", e.code) == nil
+		return e.placement == nil && e.maximum == nil && e.factorBasisPoints == nil && requireText("policy effect code", e.code) == nil
+	case PolicyEffectScoreMultiplier:
+		factor, ok := e.ScoreMultiplierBasisPoints()
+		return ok && factor > 0 && e.placement == nil && e.maximum == nil && e.code == ""
 	default:
 		return false
 	}
@@ -513,10 +557,11 @@ func clonePolicyEffects(values []PolicyEffect) []PolicyEffect {
 	result := make([]PolicyEffect, len(values))
 	for i, value := range values {
 		result[i] = PolicyEffect{
-			typeName:  value.typeName,
-			placement: clonePlacement(value.placement),
-			maximum:   cloneInt(value.maximum),
-			code:      value.code,
+			typeName:          value.typeName,
+			placement:         clonePlacement(value.placement),
+			maximum:           cloneInt(value.maximum),
+			factorBasisPoints: cloneInt(value.factorBasisPoints),
+			code:              value.code,
 		}
 	}
 	return result
