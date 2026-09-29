@@ -128,8 +128,8 @@ var baselineSpecs = map[domain.PolicyID]baselineSpec{
 }
 
 // ValidateForActivation proves that a PolicySetVersion contains exactly one
-// correctly wired instance of every UC-01 baseline policy. It does not perform
-// multi-policy composition; that is a separate policy-engine slice.
+// correctly wired instance of every UC-01 baseline policy plus only supported
+// explicitly contracted optional policies. It does not perform runtime composition.
 func ValidateForActivation(version domain.PolicySetVersion) error {
 	if strings.TrimSpace(string(version.ID())) == "" {
 		return errors.New("policy set version id must not be empty")
@@ -153,10 +153,16 @@ func ValidateForActivation(version domain.PolicySetVersion) error {
 		seenPolicy[instance.PolicyID()] = instance.ID()
 
 		spec, required := baselineSpecs[instance.PolicyID()]
-		if !required {
+		if required {
+			if err := validateInstanceAgainstSpec(instance, spec); err != nil {
+				return err
+			}
+			continue
+		}
+		if instance.EvaluatorType() != domain.PolicyEvaluatorScoreMultiplier {
 			return fmt.Errorf("policy %q is not supported by the UC-01 baseline", instance.PolicyID())
 		}
-		if err := validateInstanceAgainstSpec(instance, spec); err != nil {
+		if err := validateScoreMultiplierInstance(version, instance); err != nil {
 			return err
 		}
 	}
@@ -205,6 +211,29 @@ func validateInstanceAgainstSpec(instance domain.PolicyInstance, spec baselineSp
 	return nil
 }
 
+func validateScoreMultiplierInstance(version domain.PolicySetVersion, instance domain.PolicyInstance) error {
+	contract, ok := version.ScoreMultiplierContract()
+	if !ok {
+		return fmt.Errorf("policy %q requires an explicit score multiplier composition contract", instance.PolicyID())
+	}
+	if contract.Combinator() != domain.PolicySoftCombinatorMultiplyV1 {
+		return fmt.Errorf("policy %q uses unsupported score multiplier combinator %q", instance.PolicyID(), contract.Combinator())
+	}
+	if instance.Phase() != domain.PolicyPhaseCandidateAdjustment ||
+		instance.EffectClass() != domain.PolicyEffectSoft ||
+		instance.SubjectType() != domain.PolicySubjectProject ||
+		len(instance.RequiredInputs()) != 0 ||
+		instance.MissingInputBehavior() != domain.PolicyMissingInputFailOperation ||
+		instance.Exceptionability() != domain.PolicyNotExceptionable {
+		return fmt.Errorf("policy %q has invalid score multiplier evaluator wiring", instance.PolicyID())
+	}
+	factor, ok := instance.Parameters().ScoreMultiplierBasisPoints()
+	if !ok || factor < contract.PerEffectMinBasisPoints() || factor > contract.PerEffectMaxBasisPoints() {
+		return fmt.Errorf("policy %q score multiplier factor is outside declared per-effect bounds", instance.PolicyID())
+	}
+	return nil
+}
+
 func sameInputKinds(left, right []domain.PolicyInputKind) bool {
 	if len(left) != len(right) {
 		return false
@@ -234,11 +263,16 @@ func Evaluate(request Request) (domain.PolicyDecision, error) {
 		return domain.PolicyDecision{}, failure(instance, "unsupported_evaluator_version", nil)
 	}
 	spec, supported := baselineSpecs[instance.PolicyID()]
-	if !supported {
+	if supported {
+		if err := validateInstanceAgainstSpec(instance, spec); err != nil {
+			return domain.PolicyDecision{}, failure(instance, "invalid_policy_configuration", err)
+		}
+	} else if instance.EvaluatorType() == domain.PolicyEvaluatorScoreMultiplier {
+		if err := validateScoreMultiplierInstance(request.PolicySet, instance); err != nil {
+			return domain.PolicyDecision{}, failure(instance, "invalid_policy_configuration", err)
+		}
+	} else {
 		return domain.PolicyDecision{}, failure(instance, "unsupported_policy_configuration", fmt.Errorf("policy %q is not supported by the UC-01 baseline", instance.PolicyID()))
-	}
-	if err := validateInstanceAgainstSpec(instance, spec); err != nil {
-		return domain.PolicyDecision{}, failure(instance, "invalid_policy_configuration", err)
 	}
 	if instance.MissingInputBehavior() == domain.PolicyMissingInputDiagnosticOnly && instance.EffectClass() != domain.PolicyEffectAdvisory {
 		return domain.PolicyDecision{}, failure(instance, "invalid_policy_configuration", fmt.Errorf("diagnostic_only missing-input behavior requires advisory effect class"))
@@ -269,6 +303,8 @@ func Evaluate(request Request) (domain.PolicyDecision, error) {
 		return evaluateConfidence(request, instance)
 	case domain.PolicyEvaluatorFreshnessRule:
 		return evaluateFreshness(request, instance)
+	case domain.PolicyEvaluatorScoreMultiplier:
+		return evaluateScoreMultiplier(request, instance)
 	default:
 		return domain.PolicyDecision{}, failure(instance, "unsupported_evaluator", nil)
 	}
@@ -349,6 +385,18 @@ func evaluateConfidence(request Request, instance domain.PolicyInstance) (domain
 		return makeDecision(request, instance, domain.PolicyDecisionRequireReview, "confidence_below_review_threshold", []domain.PolicyEffect{effect})
 	}
 	return makeDecision(request, instance, domain.PolicyDecisionAllow, "confidence_sufficient", nil)
+}
+
+func evaluateScoreMultiplier(request Request, instance domain.PolicyInstance) (domain.PolicyDecision, error) {
+	factor, ok := instance.Parameters().ScoreMultiplierBasisPoints()
+	if !ok {
+		return domain.PolicyDecision{}, failure(instance, "missing_score_multiplier_factor", nil)
+	}
+	effect, err := domain.NewScoreMultiplierPolicyEffect(factor)
+	if err != nil {
+		return domain.PolicyDecision{}, failure(instance, "invalid_score_multiplier_effect", err)
+	}
+	return makeDecision(request, instance, domain.PolicyDecisionAdjust, "score_multiplier_configured", []domain.PolicyEffect{effect})
 }
 
 func evaluateFreshness(request Request, instance domain.PolicyInstance) (domain.PolicyDecision, error) {

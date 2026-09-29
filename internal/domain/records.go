@@ -122,13 +122,25 @@ func (p PolicySet) ID() PolicySetID { return p.id }
 // constructor shape while allowing activated versions to retain their exact
 // deterministic evaluator configuration.
 type PolicySetVersion struct {
-	id          PolicySetVersionID
-	policySetID PolicySetID
-	createdAt   time.Time
-	instances   []PolicyInstance
+	id                      PolicySetVersionID
+	policySetID             PolicySetID
+	createdAt               time.Time
+	instances               []PolicyInstance
+	scoreMultiplierContract *ScoreMultiplierContract
 }
 
 func NewPolicySetVersion(id PolicySetVersionID, policySetID PolicySetID, createdAt time.Time, instances ...PolicyInstance) (PolicySetVersion, error) {
+	return newPolicySetVersion(id, policySetID, createdAt, nil, instances...)
+}
+
+func NewPolicySetVersionWithScoreMultiplierContract(id PolicySetVersionID, policySetID PolicySetID, createdAt time.Time, contract ScoreMultiplierContract, instances ...PolicyInstance) (PolicySetVersion, error) {
+	if err := contract.validate(); err != nil {
+		return PolicySetVersion{}, err
+	}
+	return newPolicySetVersion(id, policySetID, createdAt, cloneScoreMultiplierContract(&contract), instances...)
+}
+
+func newPolicySetVersion(id PolicySetVersionID, policySetID PolicySetID, createdAt time.Time, scoreMultiplierContract *ScoreMultiplierContract, instances ...PolicyInstance) (PolicySetVersion, error) {
 	if err := requireIdentifier("policy set version id", string(id)); err != nil {
 		return PolicySetVersion{}, err
 	}
@@ -163,7 +175,7 @@ func NewPolicySetVersion(id PolicySetVersionID, policySetID PolicySetID, created
 		return resolved[i].ID() < resolved[j].ID()
 	})
 
-	return PolicySetVersion{id: id, policySetID: policySetID, createdAt: createdAt, instances: resolved}, nil
+	return PolicySetVersion{id: id, policySetID: policySetID, createdAt: createdAt, instances: resolved, scoreMultiplierContract: cloneScoreMultiplierContract(scoreMultiplierContract)}, nil
 }
 
 func (v PolicySetVersion) ID() PolicySetVersionID   { return v.id }

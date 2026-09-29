@@ -59,6 +59,21 @@ Numeric adjustments that affect deterministic output use exact/defined arithmeti
 
 If two effects cannot be composed under a documented combinator, the kernel reports a conflict/failure rather than choosing arbitrarily.
 
+### Optional score multiplier contract
+
+The v0 kernel supports an optional, explicitly configured score_multiplier soft effect for consumers that need exact policy-adjusted ranking.
+
+- no score multiplier is configured by default;
+- a multiplier instance carries an explicit positive basis-point factor (10000 == 1.0);
+- a PolicySetVersion that contains multiplier instances must retain a supported versioned composition contract, currently score_multiplier.multiply.v1;
+- that contract declares explicit per-effect and cumulative bounds, and cumulative bounds must include neutral 1.0;
+- composition converts basis points to reduced exact rational values and multiplies them in stable policy order without binary floating point;
+- a missing/unsupported combinator, out-of-bound factor/cumulative result, or malformed effect fails visibly; the kernel does not clamp;
+- if a hard policy prevents the subject/operation from proceeding, proposed soft multiplier steps remain traceable but the effective multiplier is neutral;
+- confidence and freshness are never implicitly converted to score multipliers. Any future relationship requires an explicit versioned policy contract.
+
+This is a compatibility surface, not a Calathea calibration default. Private product policy owns whether such a multiplier is configured and what factor/bounds are appropriate.
+
 ## Invariants versus policy
 
 Kernel correctness invariants are not configurable policies. A policy cannot disable invariants promised by another public contract, including record immutability, output cardinality/shape constraints, or explicit separation between a recommendation and an external side effect.
