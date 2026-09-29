@@ -175,29 +175,41 @@ func TestScoreMultiplierPerEffectBoundsRejectActivation(t *testing.T) {
 }
 
 func TestScoreMultiplierCumulativeBoundsFailClosed(t *testing.T) {
-	set := softPolicySet(t, 5000, 11000, 12000)
-	if err := ValidateForActivation(set); err != nil {
-		t.Fatal(err)
+	for _, tc := range []struct {
+		name          string
+		cumulativeMin int
+		cumulativeMax int
+		factor        int
+	}{
+		{"above upper", 5000, 11000, 12000},
+		{"below lower", 9000, 20000, 8000},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			set := softPolicySet(t, tc.cumulativeMin, tc.cumulativeMax, tc.factor)
+			if err := ValidateForActivation(set); err != nil {
+				t.Fatal(err)
+			}
+			subject := projectSubject(t)
+			evaluation := testEvaluation(t, 9000, policyTestTime())
+			state := domain.LifecycleApproved
+			req := ComposeBaselineRequest{PolicySet: set, OperationID: "op-bound", Subject: subject}
+			for _, instance := range set.Instances() {
+				r := request(t, set, instance.ID(), subject)
+				r.DecisionID = domain.PolicyDecisionID("decision-" + string(instance.ID()))
+				r.OperationID = req.OperationID
+				r.Context.LifecycleState = &state
+				r.Context.Evaluation = &evaluation
+				r.Context.AsOf = policyTestTime()
+				d, err := Evaluate(r)
+				if err != nil {
+					t.Fatal(err)
+				}
+				req.Decisions = append(req.Decisions, d)
+			}
+			_, err := ComposeBaseline(req)
+			requireCompositionFailure(t, err, "soft_effect_bounds")
+		})
 	}
-	subject := projectSubject(t)
-	evaluation := testEvaluation(t, 9000, policyTestTime())
-	state := domain.LifecycleApproved
-	req := ComposeBaselineRequest{PolicySet: set, OperationID: "op-bound", Subject: subject}
-	for _, instance := range set.Instances() {
-		r := request(t, set, instance.ID(), subject)
-		r.DecisionID = domain.PolicyDecisionID("decision-" + string(instance.ID()))
-		r.OperationID = req.OperationID
-		r.Context.LifecycleState = &state
-		r.Context.Evaluation = &evaluation
-		r.Context.AsOf = policyTestTime()
-		d, err := Evaluate(r)
-		if err != nil {
-			t.Fatal(err)
-		}
-		req.Decisions = append(req.Decisions, d)
-	}
-	_, err := ComposeBaseline(req)
-	requireCompositionFailure(t, err, "soft_effect_bounds")
 }
 
 func TestHardDenialSuppressesEffectiveMultiplierButKeepsProposedTrace(t *testing.T) {
