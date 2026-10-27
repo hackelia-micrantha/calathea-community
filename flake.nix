@@ -37,7 +37,9 @@
             pname = "calathea";
             inherit version;
             src = self;
-            vendorHash = null;
+            # The SQLite spike adds external Go modules; the reviewed hash must
+            # match the exact module graph rather than using an empty vendor tree.
+            vendorHash = "sha256-5WaCZ29wuU/aP05IBHTM0WhELYrYoerGlIS3QxoXL5o=";
             subPackages = [ "cmd/calathea" ];
             ldflags = [
               "-s"
